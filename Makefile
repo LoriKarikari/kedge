@@ -8,20 +8,20 @@ help:
 VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || git describe --tags 2>/dev/null || echo "dev")
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
-LDFLAGS := -X 'github.com/LoriKarikari/go-starter/internal/version.version=$(VERSION)' \
-           -X 'github.com/LoriKarikari/go-starter/internal/version.commit=$(COMMIT)'
+LDFLAGS := -X 'github.com/LoriKarikari/kedge/internal/version.version=$(VERSION)' \
+           -X 'github.com/LoriKarikari/kedge/internal/version.commit=$(COMMIT)'
 
 .PHONY: build
 build:
-	go build -ldflags "$(LDFLAGS)" -o bin/go-starter cmd/go-starter/main.go
+	go build -ldflags "$(LDFLAGS)" -o bin/kedge cmd/kedge/main.go
 
 .PHONY: install
 install: build
-	go install ./cmd/go-starter
+	go install ./cmd/kedge
 
 .PHONY: run
 run:
-	go run cmd/go-starter/main.go
+	go run cmd/kedge/main.go
 
 .PHONY: test
 test:
@@ -75,21 +75,21 @@ ci: mod check build
 
 .PHONY: docker-build
 docker-build:
-	docker build -t go-starter:latest .
+	docker build -t kedge:latest .
 
 .PHONY: docker-run
 docker-run:
-	docker run --rm -it go-starter:latest
+	docker run --rm -it kedge:latest
 
 .PHONY: release
 release:
 	@echo "Building release binaries..."
 	@mkdir -p dist
-	GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/go-starter-linux-amd64 cmd/go-starter/main.go
-	GOOS=linux GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/go-starter-linux-arm64 cmd/go-starter/main.go
-	GOOS=darwin GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/go-starter-darwin-amd64 cmd/go-starter/main.go
-	GOOS=darwin GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/go-starter-darwin-arm64 cmd/go-starter/main.go
-	GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/go-starter-windows-amd64.exe cmd/go-starter/main.go
+	GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/kedge-linux-amd64 cmd/kedge/main.go
+	GOOS=linux GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/kedge-linux-arm64 cmd/kedge/main.go
+	GOOS=darwin GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/kedge-darwin-amd64 cmd/kedge/main.go
+	GOOS=darwin GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/kedge-darwin-arm64 cmd/kedge/main.go
+	GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/kedge-windows-amd64.exe cmd/kedge/main.go
 	@echo "Release binaries built in dist/"
 
 .PHONY: dev

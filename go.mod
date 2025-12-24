@@ -1,3 +1,3 @@
-module github.com/LoriKarikari/go-starter
+module github.com/LoriKarikari/kedge
 
 go 1.25
