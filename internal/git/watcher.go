@@ -145,9 +145,7 @@ func (w *Watcher) Watch(ctx context.Context, onChange func(ChangeEvent)) {
 	events := make(chan ChangeEvent, eventQueueSize)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for {
 			select {
 			case <-ctx.Done():
@@ -166,7 +164,7 @@ func (w *Watcher) Watch(ctx context.Context, onChange func(ChangeEvent)) {
 				}()
 			}
 		}
-	}()
+	})
 
 	defer func() {
 		close(events)
