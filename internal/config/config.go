@@ -2,12 +2,21 @@ package config
 
 import (
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
+	Git     GitConfig     `yaml:"git"`
 	Logging LoggingConfig `yaml:"logging"`
+}
+
+type GitConfig struct {
+	RepoURL      string        `yaml:"repo_url"`
+	Branch       string        `yaml:"branch"`
+	PollInterval time.Duration `yaml:"poll_interval"`
+	WorkDir      string        `yaml:"work_dir"`
 }
 
 type LoggingConfig struct {
@@ -17,6 +26,11 @@ type LoggingConfig struct {
 
 func Default() *Config {
 	return &Config{
+		Git: GitConfig{
+			Branch:       "main",
+			PollInterval: 60 * time.Second,
+			WorkDir:      "/var/lib/kedge/repo",
+		},
 		Logging: LoggingConfig{
 			Level:  "info",
 			Format: "text",
