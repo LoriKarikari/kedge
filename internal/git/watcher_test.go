@@ -85,7 +85,10 @@ func (r *testRepo) addCommit(t *testing.T, message string) string {
 	t.Helper()
 
 	testFile := filepath.Join(r.clonePath, "test.txt")
-	data, _ := os.ReadFile(testFile)
+	data, err := os.ReadFile(testFile)
+	if err != nil {
+		t.Fatalf("failed to read test file: %v", err)
+	}
 	if err := os.WriteFile(testFile, append(data, []byte("\n"+message)...), 0644); err != nil {
 		t.Fatalf("failed to update test file: %v", err)
 	}
