@@ -2,6 +2,7 @@ package reconcile
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -17,6 +18,8 @@ const (
 	ModeNotify Mode = "notify"
 	ModeManual Mode = "manual"
 )
+
+var errProjectNil = errors.New("project is nil")
 
 type Config struct {
 	Mode     Mode
@@ -78,6 +81,9 @@ func (r *Reconciler) getProjectAndCommit() (*types.Project, string) {
 
 func (r *Reconciler) Reconcile(ctx context.Context) *Result {
 	project, _ := r.getProjectAndCommit()
+	if project == nil {
+		return &Result{Error: errProjectNil}
+	}
 
 	diff, err := r.client.Diff(ctx, project)
 	if err != nil {
@@ -108,6 +114,9 @@ func (r *Reconciler) Sync(ctx context.Context) *Result {
 	r.logger.Info("force sync requested")
 
 	project, commit := r.getProjectAndCommit()
+	if project == nil {
+		return &Result{Error: errProjectNil}
+	}
 
 	if err := r.client.Deploy(ctx, project, commit); err != nil {
 		return &Result{Error: err}
