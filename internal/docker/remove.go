@@ -21,18 +21,17 @@ func (c *Client) kedgeFilters() filters.Args {
 func (c *Client) Remove(ctx context.Context) error {
 	c.logger.Info("removing project resources")
 
-	if err := c.removeContainers(ctx); err != nil {
-		return err
-	}
-
-	return c.removeNetworks(ctx)
+	return errors.Join(
+		c.removeContainers(ctx),
+		c.removeNetworks(ctx),
+	)
 }
 
 func (c *Client) removeContainers(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	listCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	containers, err := c.cli.ContainerList(ctx, container.ListOptions{
+	containers, err := c.cli.ContainerList(listCtx, container.ListOptions{
 		All:     true,
 		Filters: c.kedgeFilters(),
 	})
@@ -51,10 +50,10 @@ func (c *Client) removeContainers(ctx context.Context) error {
 }
 
 func (c *Client) removeNetworks(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	listCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	networks, err := c.cli.NetworkList(ctx, network.ListOptions{Filters: c.kedgeFilters()})
+	networks, err := c.cli.NetworkList(listCtx, network.ListOptions{Filters: c.kedgeFilters()})
 	if err != nil {
 		return fmt.Errorf("list networks: %w", err)
 	}
@@ -62,9 +61,12 @@ func (c *Client) removeNetworks(ctx context.Context) error {
 	var errs []error
 	for i := range networks {
 		c.logger.Info("removing network", "network", networks[i].Name)
-		if err := c.cli.NetworkRemove(ctx, networks[i].ID); err != nil {
+
+		removeCtx, removeCancel := context.WithTimeout(ctx, defaultTimeout)
+		if err := c.cli.NetworkRemove(removeCtx, networks[i].ID); err != nil {
 			errs = append(errs, fmt.Errorf("remove network %s: %w", networks[i].Name, err))
 		}
+		removeCancel()
 	}
 
 	return errors.Join(errs...)
@@ -84,10 +86,10 @@ func (c *Client) RemoveService(ctx context.Context, serviceName string) error {
 }
 
 func (c *Client) Prune(ctx context.Context, keepServices []string) error {
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	listCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	containers, err := c.cli.ContainerList(ctx, container.ListOptions{
+	containers, err := c.cli.ContainerList(listCtx, container.ListOptions{
 		All:     true,
 		Filters: c.kedgeFilters(),
 	})
