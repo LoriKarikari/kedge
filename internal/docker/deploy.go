@@ -144,7 +144,7 @@ func (c *Client) removeContainer(ctx context.Context, containerID string) error 
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	c.logger.Info("removing container", "container", containerID[:12])
+	c.logger.Info("removing container", "container", lo.Substring(containerID, 0, 12))
 	return c.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
 }
 
@@ -182,7 +182,7 @@ func (c *Client) createAndStartContainer(ctx context.Context, projectName, servi
 		return fmt.Errorf("create container: %w", err)
 	}
 
-	c.logger.Info("created container", "container", resp.ID[:12], "service", serviceName)
+	c.logger.Info("created container", "container", lo.Substring(resp.ID, 0, 12), "service", serviceName)
 
 	if err := c.connectToNetworks(ctx, resp.ID, svc, projectName); err != nil {
 		return err
@@ -195,7 +195,7 @@ func (c *Client) createAndStartContainer(ctx context.Context, projectName, servi
 		return fmt.Errorf("start container: %w", err)
 	}
 
-	c.logger.Info("started container", "container", resp.ID[:12], "service", serviceName)
+	c.logger.Info("started container", "container", lo.Substring(resp.ID, 0, 12), "service", serviceName)
 	return nil
 }
 
