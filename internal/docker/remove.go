@@ -10,6 +10,13 @@ import (
 	"github.com/samber/lo"
 )
 
+func (c *Client) kedgeFilters() filters.Args {
+	return filters.NewArgs(
+		filters.Arg("label", LabelManaged+"=true"),
+		filters.Arg("label", fmt.Sprintf("%s=%s", LabelProject, c.projectName)),
+	)
+}
+
 func (c *Client) Remove(ctx context.Context) error {
 	c.logger.Info("removing project resources")
 
@@ -24,14 +31,9 @@ func (c *Client) removeContainers(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	args := filters.NewArgs(
-		filters.Arg("label", fmt.Sprintf("%s=true", LabelManaged)),
-		filters.Arg("label", fmt.Sprintf("%s=%s", LabelProject, c.projectName)),
-	)
-
 	containers, err := c.cli.ContainerList(ctx, container.ListOptions{
 		All:     true,
-		Filters: args,
+		Filters: c.kedgeFilters(),
 	})
 	if err != nil {
 		return fmt.Errorf("list containers: %w", err)
@@ -50,12 +52,7 @@ func (c *Client) removeNetworks(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	args := filters.NewArgs(
-		filters.Arg("label", fmt.Sprintf("%s=true", LabelManaged)),
-		filters.Arg("label", fmt.Sprintf("%s=%s", LabelProject, c.projectName)),
-	)
-
-	networks, err := c.cli.NetworkList(ctx, network.ListOptions{Filters: args})
+	networks, err := c.cli.NetworkList(ctx, network.ListOptions{Filters: c.kedgeFilters()})
 	if err != nil {
 		return fmt.Errorf("list networks: %w", err)
 	}
@@ -87,14 +84,9 @@ func (c *Client) Prune(ctx context.Context, keepServices []string) error {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	args := filters.NewArgs(
-		filters.Arg("label", fmt.Sprintf("%s=true", LabelManaged)),
-		filters.Arg("label", fmt.Sprintf("%s=%s", LabelProject, c.projectName)),
-	)
-
 	containers, err := c.cli.ContainerList(ctx, container.ListOptions{
 		All:     true,
-		Filters: args,
+		Filters: c.kedgeFilters(),
 	})
 	if err != nil {
 		return fmt.Errorf("list containers: %w", err)

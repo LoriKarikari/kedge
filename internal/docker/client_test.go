@@ -6,13 +6,16 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+)
 
-	"github.com/samber/lo"
+const (
+	testProjectName    = "kedge-test"
+	skipIntegrationMsg = "skipping integration test"
 )
 
 func skipIfNoDocker(t *testing.T) *Client {
 	t.Helper()
-	client, err := NewClient("kedge-test", nil)
+	client, err := NewClient(testProjectName, nil)
 	if err != nil {
 		t.Skipf("docker not available: %v", err)
 	}
@@ -22,21 +25,21 @@ func skipIfNoDocker(t *testing.T) *Client {
 
 func TestNewClient(t *testing.T) {
 	client := skipIfNoDocker(t)
-	if client.projectName != "kedge-test" {
-		t.Errorf("got project name %q, want %q", client.projectName, "kedge-test")
+	if client.projectName != testProjectName {
+		t.Errorf("got project name %q, want %q", client.projectName, testProjectName)
 	}
 }
 
-func TestIntegration_DeployAndRemove(t *testing.T) {
+func TestIntegrationDeployAndRemove(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test")
+		t.Skip(skipIntegrationMsg)
 	}
 
 	client := skipIfNoDocker(t)
 	ctx := t.Context()
 
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, "docker-compose.yaml")
+	composePath := filepath.Join(dir, testComposeFile)
 
 	content := `
 services:
@@ -49,7 +52,7 @@ services:
 		t.Fatal(err)
 	}
 
-	project, err := LoadProject(ctx, composePath, "kedge-test")
+	project, err := LoadProject(ctx, composePath, testProjectName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,16 +100,16 @@ services:
 	}
 }
 
-func TestIntegration_Prune(t *testing.T) {
+func TestIntegrationPrune(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test")
+		t.Skip(skipIntegrationMsg)
 	}
 
 	client := skipIfNoDocker(t)
 	ctx := t.Context()
 
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, "docker-compose.yaml")
+	composePath := filepath.Join(dir, testComposeFile)
 
 	content := `
 services:
@@ -119,7 +122,7 @@ services:
 		t.Fatal(err)
 	}
 
-	project, err := LoadProject(ctx, composePath, "kedge-test")
+	project, err := LoadProject(ctx, composePath, testProjectName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,16 +155,16 @@ services:
 	}
 }
 
-func TestIntegration_RedeployUpdatesContainer(t *testing.T) {
+func TestIntegrationRedeployUpdatesContainer(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test")
+		t.Skip(skipIntegrationMsg)
 	}
 
 	client := skipIfNoDocker(t)
 	ctx := t.Context()
 
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, "docker-compose.yaml")
+	composePath := filepath.Join(dir, testComposeFile)
 
 	content := `
 services:
@@ -172,7 +175,7 @@ services:
 		t.Fatal(err)
 	}
 
-	project, err := LoadProject(ctx, composePath, "kedge-test")
+	project, err := LoadProject(ctx, composePath, testProjectName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,17 +190,27 @@ services:
 		t.Fatal(err)
 	}
 
-	statuses1, _ := client.Status(ctx)
-	container1 := lo.Ternary(len(statuses1) > 0, statuses1[0].Container, "")
+	statuses1, err := client.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(statuses1) == 0 {
+		t.Fatal("expected container after first deploy")
+	}
 
 	if err := client.Deploy(ctx, project, "commit-2"); err != nil {
 		t.Fatal(err)
 	}
 
-	statuses2, _ := client.Status(ctx)
-	container2 := lo.Ternary(len(statuses2) > 0, statuses2[0].Container, "")
+	statuses2, err := client.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(statuses2) == 0 {
+		t.Fatal("expected container after second deploy")
+	}
 
-	if container1 != container2 {
-		t.Log("container was recreated (expected when image matches)")
+	if statuses1[0].Container == statuses2[0].Container {
+		t.Log("container reused (same image)")
 	}
 }

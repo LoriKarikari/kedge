@@ -143,7 +143,7 @@ func (c *Client) createAndStartContainer(ctx context.Context, projectName, servi
 	labels := kedgeLabels(projectName, serviceName, commit)
 	maps.Copy(labels, svc.Labels)
 
-	exposedPorts, portBindings := buildPortMappings(svc.Ports)
+	exposedPorts, portBindings := c.buildPortMappings(svc.Ports)
 
 	env := lo.MapToSlice(svc.Environment, func(k string, v *string) string {
 		return lo.Ternary(v != nil, fmt.Sprintf("%s=%s", k, *v), k)
@@ -206,13 +206,14 @@ func (c *Client) connectToNetworks(ctx context.Context, containerID string, svc 
 	return nil
 }
 
-func buildPortMappings(ports []types.ServicePortConfig) (nat.PortSet, nat.PortMap) {
+func (c *Client) buildPortMappings(ports []types.ServicePortConfig) (nat.PortSet, nat.PortMap) {
 	exposedPorts := nat.PortSet{}
 	portBindings := nat.PortMap{}
 
 	for _, p := range ports {
 		port, err := nat.NewPort(p.Protocol, fmt.Sprintf("%d", p.Target))
 		if err != nil {
+			c.logger.Warn("invalid port config, skipping", "port", p.Target, "protocol", p.Protocol, "error", err)
 			continue
 		}
 		exposedPorts[port] = struct{}{}

@@ -32,13 +32,23 @@ func (c *Client) Status(ctx context.Context) ([]ServiceStatus, error) {
 	return lo.Map(containers, func(cont container.Summary, _ int) ServiceStatus {
 		return ServiceStatus{
 			Service:   cont.Labels[LabelService],
-			Container: lo.Ternary(len(cont.Names) > 0, cont.Names[0], cont.ID[:12]),
+			Container: shortContainerID(cont),
 			Image:     cont.Image,
 			State:     cont.State,
 			Health:    extractHealth(cont),
 			CreatedAt: time.Unix(cont.Created, 0),
 		}
 	}), nil
+}
+
+func shortContainerID(cont container.Summary) string {
+	if len(cont.Names) > 0 {
+		return cont.Names[0]
+	}
+	if len(cont.ID) >= 12 {
+		return cont.ID[:12]
+	}
+	return cont.ID
 }
 
 func extractHealth(cont container.Summary) string {
