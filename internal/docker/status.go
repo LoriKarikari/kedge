@@ -42,21 +42,14 @@ func (c *Client) Status(ctx context.Context) ([]ServiceStatus, error) {
 }
 
 func shortContainerID(cont container.Summary) string {
-	if len(cont.Names) > 0 {
-		return cont.Names[0]
-	}
-	if len(cont.ID) >= 12 {
-		return cont.ID[:12]
-	}
-	return cont.ID
+	return lo.CoalesceOrEmpty(
+		lo.FirstOrEmpty(cont.Names),
+		lo.Substring(cont.ID, 0, 12),
+	)
 }
 
 func extractHealth(cont container.Summary) string {
-	if cont.Status == "" {
-		return ""
-	}
-	if cont.State != "running" {
-		return cont.State
-	}
-	return lo.Ternary(cont.Status != "", cont.Status, "unknown")
+	return lo.Switch[string, string](cont.State).
+		Case("running", cont.Status).
+		Default(cont.State)
 }

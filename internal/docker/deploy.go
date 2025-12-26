@@ -125,10 +125,8 @@ func (c *Client) findContainer(ctx context.Context, serviceName string) (*contai
 		return nil, err
 	}
 
-	if len(containers) == 0 {
-		return nil, nil
-	}
-	return &containers[0], nil
+	first, found := lo.First(containers)
+	return lo.Ternary(found, &first, nil), nil
 }
 
 func (c *Client) removeContainer(ctx context.Context, containerID string) error {
@@ -229,21 +227,19 @@ func (c *Client) buildPortMappings(ports []types.ServicePortConfig) (nat.PortSet
 	return exposedPorts, portBindings
 }
 
+var restartPolicies = map[string]container.RestartPolicyMode{
+	"always":         container.RestartPolicyAlways,
+	"on-failure":     container.RestartPolicyOnFailure,
+	"unless-stopped": container.RestartPolicyUnlessStopped,
+}
+
 func buildRestartPolicy(svc types.ServiceConfig) container.RestartPolicy {
 	policy := svc.Restart
 	if svc.Deploy != nil && svc.Deploy.RestartPolicy != nil {
 		policy = svc.Deploy.RestartPolicy.Condition
 	}
-
-	switch policy {
-	case "always":
-		return container.RestartPolicy{Name: container.RestartPolicyAlways}
-	case "on-failure":
-		return container.RestartPolicy{Name: container.RestartPolicyOnFailure}
-	case "unless-stopped":
-		return container.RestartPolicy{Name: container.RestartPolicyUnlessStopped}
-	default:
-		return container.RestartPolicy{Name: container.RestartPolicyDisabled}
+	return container.RestartPolicy{
+		Name: lo.ValueOr(restartPolicies, policy, container.RestartPolicyDisabled),
 	}
 }
 
@@ -252,15 +248,10 @@ func containerName(projectName, serviceName string) string {
 }
 
 func kedgeLabels(projectName, serviceName, commit string) map[string]string {
-	labels := map[string]string{
+	return lo.OmitByValues(map[string]string{
 		LabelManaged: "true",
 		LabelProject: projectName,
-	}
-	if serviceName != "" {
-		labels[LabelService] = serviceName
-	}
-	if commit != "" {
-		labels[LabelCommit] = commit
-	}
-	return labels
+		LabelService: serviceName,
+		LabelCommit:  commit,
+	}, []string{""})
 }
