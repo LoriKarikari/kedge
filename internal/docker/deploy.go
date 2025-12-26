@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"maps"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -138,8 +137,7 @@ func (c *Client) removeContainer(ctx context.Context, containerID string) error 
 }
 
 func (c *Client) createAndStartContainer(ctx context.Context, projectName, serviceName string, svc types.ServiceConfig, commit string) error {
-	labels := kedgeLabels(projectName, serviceName, commit)
-	maps.Copy(labels, svc.Labels)
+	labels := lo.Assign(svc.Labels, kedgeLabels(projectName, serviceName, commit))
 
 	exposedPorts, portBindings := c.buildPortMappings(svc.Ports)
 
