@@ -19,7 +19,11 @@ func skipIfNoDocker(t *testing.T) *Client {
 	if err != nil {
 		t.Skipf("docker not available: %v", err)
 	}
-	t.Cleanup(func() { client.Close() })
+	_ = client.Remove(t.Context())
+	t.Cleanup(func() {
+		_ = client.Remove(t.Context())
+		client.Close()
+	})
 	return client
 }
 
