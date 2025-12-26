@@ -145,61 +145,78 @@ func (w *Watcher) Watch(ctx context.Context, onChange func(ChangeEvent)) {
 	events := make(chan ChangeEvent, eventQueueSize)
 
 	var wg sync.WaitGroup
-	wg.Go(func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case event, ok := <-events:
-				if !ok {
-					return
-				}
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							slog.Error("panic in onChange handler", "error", r)
-						}
-					}()
-					onChange(event)
-				}()
-			}
-		}
-	})
+	wg.Go(func() { w.runEventHandler(ctx, events, onChange) })
 
 	defer func() {
 		close(events)
 		wg.Wait()
 	}()
 
+	w.pollLoop(ctx, ticker, events)
+}
+
+func (w *Watcher) runEventHandler(ctx context.Context, events <-chan ChangeEvent, onChange func(ChangeEvent)) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event, ok := <-events:
+			if !ok {
+				return
+			}
+			w.safeCallHandler(onChange, event)
+		}
+	}
+}
+
+func (w *Watcher) safeCallHandler(onChange func(ChangeEvent), event ChangeEvent) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("panic in onChange handler", "error", r)
+		}
+	}()
+	onChange(event)
+}
+
+func (w *Watcher) pollLoop(ctx context.Context, ticker *time.Ticker, events chan<- ChangeEvent) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			changed, hash, err := w.Pull(ctx)
-			if err != nil {
-				slog.Error("failed to pull", "error", err)
-				continue
-			}
+			w.handleTick(ctx, events)
+		}
+	}
+}
 
-			if changed {
-				event := ChangeEvent{
-					Commit:    hash,
-					Timestamp: time.Now(),
-					Message:   w.getCommitMessage(hash),
-				}
-				enqueued := false
-				for !enqueued {
-					select {
-					case events <- event:
-						enqueued = true
-					case <-ctx.Done():
-						return
-					case <-time.After(w.pollInterval):
-						slog.Warn("event queue full; waiting for handler", "commit", hash)
-					}
-				}
-			}
+func (w *Watcher) handleTick(ctx context.Context, events chan<- ChangeEvent) {
+	changed, hash, err := w.Pull(ctx)
+	if err != nil {
+		slog.Error("failed to pull", "error", err)
+		return
+	}
+
+	if !changed {
+		return
+	}
+
+	event := ChangeEvent{
+		Commit:    hash,
+		Timestamp: time.Now(),
+		Message:   w.getCommitMessage(hash),
+	}
+	w.enqueueEvent(ctx, events, event)
+}
+
+func (w *Watcher) enqueueEvent(ctx context.Context, events chan<- ChangeEvent, event ChangeEvent) {
+	for {
+		select {
+		case events <- event:
+			return
+		case <-ctx.Done():
+			return
+		case <-time.After(w.pollInterval):
+			slog.Warn("event queue full; waiting for handler", "commit", event.Commit)
 		}
 	}
 }
