@@ -1,7 +1,6 @@
 package docker
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -57,7 +56,7 @@ services:
 }
 
 func TestLoadProjectInvalidFile(t *testing.T) {
-	_, err := LoadProject(context.Background(), "/nonexistent/compose.yaml", "test")
+	_, err := LoadProject(t.Context(), "/nonexistent/compose.yaml", "test")
 	if err == nil {
 		t.Error("expected error for nonexistent file")
 	}

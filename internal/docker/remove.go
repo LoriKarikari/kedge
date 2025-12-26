@@ -2,6 +2,7 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/docker/docker/api/types/container"
@@ -39,13 +40,14 @@ func (c *Client) removeContainers(ctx context.Context) error {
 		return fmt.Errorf("list containers: %w", err)
 	}
 
+	var errs []error
 	for i := range containers {
 		if err := c.removeContainer(ctx, containers[i].ID); err != nil {
-			return err
+			errs = append(errs, err)
 		}
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
 func (c *Client) removeNetworks(ctx context.Context) error {
@@ -57,14 +59,15 @@ func (c *Client) removeNetworks(ctx context.Context) error {
 		return fmt.Errorf("list networks: %w", err)
 	}
 
+	var errs []error
 	for i := range networks {
 		c.logger.Info("removing network", "network", networks[i].Name)
 		if err := c.cli.NetworkRemove(ctx, networks[i].ID); err != nil {
-			return fmt.Errorf("remove network %s: %w", networks[i].Name, err)
+			errs = append(errs, fmt.Errorf("remove network %s: %w", networks[i].Name, err))
 		}
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
 func (c *Client) RemoveService(ctx context.Context, serviceName string) error {
@@ -92,6 +95,7 @@ func (c *Client) Prune(ctx context.Context, keepServices []string) error {
 		return fmt.Errorf("list containers: %w", err)
 	}
 
+	var errs []error
 	for i := range containers {
 		serviceName := containers[i].Labels[LabelService]
 		if lo.Contains(keepServices, serviceName) {
@@ -99,9 +103,9 @@ func (c *Client) Prune(ctx context.Context, keepServices []string) error {
 		}
 		c.logger.Info("pruning orphan container", "service", serviceName)
 		if err := c.removeContainer(ctx, containers[i].ID); err != nil {
-			return err
+			errs = append(errs, err)
 		}
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
