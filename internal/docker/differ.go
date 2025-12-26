@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
@@ -61,11 +62,11 @@ func (c *Client) Diff(ctx context.Context, project *types.Project) (*DiffResult,
 		delete(actual, name)
 	}
 
-	for name, cont := range actual {
+	for name := range actual {
 		changes = append(changes, ServiceDiff{
 			Service:      name,
 			Action:       ActionRemove,
-			CurrentImage: cont.Image,
+			CurrentImage: actual[name].Image,
 			Reason:       "service removed from compose file",
 		})
 	}
@@ -135,7 +136,7 @@ func (c *Client) isImageChanged(ctx context.Context, desiredImage, actualImageID
 	return inspect.ID != actualImageID, nil
 }
 
-func (c *Client) CheckForUpdates(ctx context.Context, project *types.Project) (map[string]bool, error) {
+func (c *Client) CheckForUpdates(ctx context.Context, project *types.Project) map[string]bool {
 	updates := make(map[string]bool)
 
 	for name := range project.Services {
@@ -148,7 +149,7 @@ func (c *Client) CheckForUpdates(ctx context.Context, project *types.Project) (m
 		updates[name] = hasUpdate
 	}
 
-	return updates, nil
+	return updates
 }
 
 func (c *Client) checkImageUpdate(ctx context.Context, imageName string) (bool, error) {
@@ -196,15 +197,16 @@ func buildSummary(changes []ServiceDiff) string {
 		return d.Action
 	})
 
-	parts := lo.FilterMap([]DiffAction{ActionCreate, ActionUpdate, ActionRemove}, func(action DiffAction, _ int) (string, bool) {
-		count := counts[action]
-		if count == 0 {
-			return "", false
-		}
-		return fmt.Sprintf("%d to %s", count, action), true
-	})
+	parts := lo.FilterMap(
+		[]DiffAction{ActionCreate, ActionUpdate, ActionRemove},
+		func(action DiffAction, _ int) (string, bool) {
+			count := counts[action]
+			if count == 0 {
+				return "", false
+			}
+			return fmt.Sprintf("%d to %s", count, action), true
+		},
+	)
 
-	return lo.Reduce(parts, func(acc string, part string, i int) string {
-		return lo.Ternary(i == 0, part, acc+", "+part)
-	}, "")
+	return strings.Join(parts, ", ")
 }
