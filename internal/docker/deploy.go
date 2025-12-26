@@ -68,7 +68,8 @@ func (c *Client) ensureNetwork(ctx context.Context, name string) error {
 func (c *Client) deployService(ctx context.Context, projectName, serviceName string, svc types.ServiceConfig, commit string) error {
 	c.logger.Info("deploying service", "service", serviceName, "image", svc.Image)
 
-	if err := c.pullImage(ctx, svc.Image); err != nil {
+	imageID, err := c.pullImage(ctx, svc.Image)
+	if err != nil {
 		return fmt.Errorf("pull image: %w", err)
 	}
 
@@ -78,7 +79,7 @@ func (c *Client) deployService(ctx context.Context, projectName, serviceName str
 	}
 
 	if existing != nil {
-		if existing.Image == svc.Image && existing.State == "running" {
+		if existing.ImageID == imageID && existing.State == "running" {
 			c.logger.Info("service already running with correct image", "service", serviceName)
 			return nil
 		}
@@ -90,20 +91,31 @@ func (c *Client) deployService(ctx context.Context, projectName, serviceName str
 	return c.createAndStartContainer(ctx, projectName, serviceName, svc, commit)
 }
 
-func (c *Client) pullImage(ctx context.Context, imageName string) error {
-	ctx, cancel := context.WithTimeout(ctx, pullTimeout)
+func (c *Client) pullImage(ctx context.Context, imageName string) (string, error) {
+	pullCtx, cancel := context.WithTimeout(ctx, pullTimeout)
 	defer cancel()
 
 	c.logger.Info("pulling image", "image", imageName)
 
-	reader, err := c.cli.ImagePull(ctx, imageName, image.PullOptions{})
+	reader, err := c.cli.ImagePull(pullCtx, imageName, image.PullOptions{})
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer reader.Close()
 
-	_, err = io.Copy(io.Discard, reader)
-	return err
+	if _, err = io.Copy(io.Discard, reader); err != nil {
+		return "", err
+	}
+
+	inspectCtx, inspectCancel := context.WithTimeout(ctx, defaultTimeout)
+	defer inspectCancel()
+
+	inspect, err := c.cli.ImageInspect(inspectCtx, imageName)
+	if err != nil {
+		return "", fmt.Errorf("inspect image: %w", err)
+	}
+
+	return inspect.ID, nil
 }
 
 func (c *Client) findContainer(ctx context.Context, serviceName string) (*container.Summary, error) {
