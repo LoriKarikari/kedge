@@ -3,6 +3,7 @@ package reconcile
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/LoriKarikari/kedge/internal/docker"
@@ -29,10 +30,12 @@ type Result struct {
 }
 
 type Reconciler struct {
-	client  *docker.Client
+	client *docker.Client
+	config Config
+	logger *slog.Logger
+
+	mu      sync.RWMutex
 	project *types.Project
-	config  Config
-	logger  *slog.Logger
 	commit  string
 }
 
@@ -56,15 +59,27 @@ func New(client *docker.Client, project *types.Project, cfg Config, logger *slog
 }
 
 func (r *Reconciler) SetCommit(commit string) {
+	r.mu.Lock()
 	r.commit = commit
+	r.mu.Unlock()
 }
 
 func (r *Reconciler) SetProject(project *types.Project) {
+	r.mu.Lock()
 	r.project = project
+	r.mu.Unlock()
+}
+
+func (r *Reconciler) getProjectAndCommit() (*types.Project, string) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.project, r.commit
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context) *Result {
-	diff, err := r.client.Diff(ctx, r.project)
+	project, _ := r.getProjectAndCommit()
+
+	diff, err := r.client.Diff(ctx, project)
 	if err != nil {
 		return &Result{Error: err}
 	}
@@ -92,11 +107,13 @@ func (r *Reconciler) Reconcile(ctx context.Context) *Result {
 func (r *Reconciler) Sync(ctx context.Context) *Result {
 	r.logger.Info("force sync requested")
 
-	if err := r.client.Deploy(ctx, r.project, r.commit); err != nil {
+	project, commit := r.getProjectAndCommit()
+
+	if err := r.client.Deploy(ctx, project, commit); err != nil {
 		return &Result{Error: err}
 	}
 
-	serviceNames := docker.ServiceNames(r.project)
+	serviceNames := docker.ServiceNames(project)
 	if err := r.client.Prune(ctx, serviceNames); err != nil {
 		r.logger.Warn("prune failed", "error", err)
 	}
@@ -107,11 +124,13 @@ func (r *Reconciler) Sync(ctx context.Context) *Result {
 func (r *Reconciler) apply(ctx context.Context, changes []docker.ServiceDiff) *Result {
 	r.logger.Info("applying changes", "count", len(changes))
 
-	if err := r.client.Deploy(ctx, r.project, r.commit); err != nil {
+	project, commit := r.getProjectAndCommit()
+
+	if err := r.client.Deploy(ctx, project, commit); err != nil {
 		return &Result{Error: err, Changes: changes}
 	}
 
-	serviceNames := docker.ServiceNames(r.project)
+	serviceNames := docker.ServiceNames(project)
 	if err := r.client.Prune(ctx, serviceNames); err != nil {
 		r.logger.Warn("prune failed", "error", err)
 	}
