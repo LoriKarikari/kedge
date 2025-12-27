@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	z "github.com/Oudwins/zog"
 	_ "modernc.org/sqlite" // sqlite driver
 )
 
@@ -21,6 +22,23 @@ const (
 
 	DefaultListLimit = 100
 )
+
+var statusSchema = z.String().OneOf([]string{
+	string(StatusPending),
+	string(StatusSuccess),
+	string(StatusFailed),
+	string(StatusRolledBack),
+})
+
+var ErrInvalidStatus = errors.New("invalid deployment status")
+
+func validateStatus(status DeploymentStatus) error {
+	s := string(status)
+	if errs := statusSchema.Validate(&s); errs != nil {
+		return ErrInvalidStatus
+	}
+	return nil
+}
 
 type Deployment struct {
 	ID             int64
@@ -78,6 +96,9 @@ func (s *Store) Close() error {
 }
 
 func (s *Store) SaveDeployment(ctx context.Context, commit, composeContent string, status DeploymentStatus, message string) (*Deployment, error) {
+	if err := validateStatus(status); err != nil {
+		return nil, err
+	}
 	result, err := s.db.ExecContext(ctx,
 		`INSERT INTO deployments (commit_hash, compose_content, status, message) VALUES (?, ?, ?, ?)`,
 		commit, composeContent, status, message,
@@ -143,6 +164,9 @@ func (s *Store) ListDeployments(ctx context.Context, limit int) ([]*Deployment, 
 }
 
 func (s *Store) UpdateDeploymentStatus(ctx context.Context, id int64, status DeploymentStatus, message string) error {
+	if err := validateStatus(status); err != nil {
+		return err
+	}
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE deployments SET status = ?, message = ? WHERE id = ?`,
 		status, message, id,

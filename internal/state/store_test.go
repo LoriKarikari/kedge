@@ -193,3 +193,27 @@ func TestStatusRolledBack(t *testing.T) {
 		t.Errorf("status: got %q, want %q", updated.Status, StatusRolledBack)
 	}
 }
+
+func TestSaveDeploymentInvalidStatus(t *testing.T) {
+	store := newTestStore(t)
+
+	_, err := store.SaveDeployment(t.Context(), "abc123", "content", "invalid", "")
+	if err != ErrInvalidStatus {
+		t.Errorf("error: got %v, want ErrInvalidStatus", err)
+	}
+}
+
+func TestUpdateDeploymentStatusInvalid(t *testing.T) {
+	store := newTestStore(t)
+	ctx := t.Context()
+
+	d, err := store.SaveDeployment(ctx, "abc123", "content", StatusPending, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = store.UpdateDeploymentStatus(ctx, d.ID, "invalid", "")
+	if err != ErrInvalidStatus {
+		t.Errorf("error: got %v, want ErrInvalidStatus", err)
+	}
+}
