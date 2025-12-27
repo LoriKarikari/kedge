@@ -70,11 +70,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("\n=== Last Deployment ===")
 	deployment, err := store.GetLastDeployment(ctx)
-	if err == state.ErrNotFound {
+	switch {
+	case err == state.ErrNotFound:
 		fmt.Println("No deployments yet")
-	} else if err != nil {
+	case err != nil:
 		return err
-	} else {
+	default:
 		fmt.Printf("Commit:  %s\n", deployment.CommitHash)
 		fmt.Printf("Status:  %s\n", deployment.Status)
 		fmt.Printf("Time:    %s\n", deployment.DeployedAt.Format("2006-01-02 15:04:05"))
