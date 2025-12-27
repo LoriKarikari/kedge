@@ -8,23 +8,10 @@ import (
 	"time"
 )
 
-const (
-	testProjectName    = "kedge-test"
-	skipIntegrationMsg = "skipping integration test"
-)
-
-func skipIfNoDocker(t *testing.T) *Client {
-	t.Helper()
-	client, err := NewClient(testProjectName, nil)
-	if err != nil {
-		t.Skipf("docker not available: %v", err)
-	}
-	t.Cleanup(func() { client.Close() })
-	return client
-}
+const testProjectName = "kedge-test"
 
 func TestNewClient(t *testing.T) {
-	client := skipIfNoDocker(t)
+	client := NewTestClient(t, testProjectName)
 	if client.projectName != testProjectName {
 		t.Errorf("got project name %q, want %q", client.projectName, testProjectName)
 	}
@@ -32,14 +19,14 @@ func TestNewClient(t *testing.T) {
 
 func TestIntegrationDeployAndRemove(t *testing.T) {
 	if testing.Short() {
-		t.Skip(skipIntegrationMsg)
+		t.Skip(SkipIntegrationMsg)
 	}
 
-	client := skipIfNoDocker(t)
+	client := NewTestClient(t, testProjectName)
 	ctx := t.Context()
 
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, testComposeFile)
+	composePath := filepath.Join(dir, TestComposeFile)
 
 	content := `
 services:
@@ -102,14 +89,14 @@ services:
 
 func TestIntegrationPrune(t *testing.T) {
 	if testing.Short() {
-		t.Skip(skipIntegrationMsg)
+		t.Skip(SkipIntegrationMsg)
 	}
 
-	client := skipIfNoDocker(t)
+	client := NewTestClient(t, testProjectName)
 	ctx := t.Context()
 
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, testComposeFile)
+	composePath := filepath.Join(dir, TestComposeFile)
 
 	content := `
 services:
@@ -157,14 +144,14 @@ services:
 
 func TestIntegrationRedeployUpdatesContainer(t *testing.T) {
 	if testing.Short() {
-		t.Skip(skipIntegrationMsg)
+		t.Skip(SkipIntegrationMsg)
 	}
 
-	client := skipIfNoDocker(t)
+	client := NewTestClient(t, testProjectName)
 	ctx := t.Context()
 
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, testComposeFile)
+	composePath := filepath.Join(dir, TestComposeFile)
 
 	content := `
 services:

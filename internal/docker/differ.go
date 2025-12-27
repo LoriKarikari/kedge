@@ -193,20 +193,14 @@ func buildSummary(changes []ServiceDiff) string {
 		return "all services in sync"
 	}
 
-	counts := lo.CountValuesBy(changes, func(d ServiceDiff) DiffAction {
-		return d.Action
-	})
+	counts := lo.CountValuesBy(changes, func(d ServiceDiff) DiffAction { return d.Action })
 
-	parts := lo.FilterMap(
-		[]DiffAction{ActionCreate, ActionUpdate, ActionRemove},
-		func(action DiffAction, _ int) (string, bool) {
-			count := counts[action]
-			if count == 0 {
-				return "", false
-			}
-			return fmt.Sprintf("%d to %s", count, action), true
-		},
-	)
+	var parts []string
+	for _, action := range []DiffAction{ActionCreate, ActionUpdate, ActionRemove} {
+		if count := counts[action]; count > 0 {
+			parts = append(parts, fmt.Sprintf("%d to %s", count, action))
+		}
+	}
 
 	return strings.Join(parts, ", ")
 }

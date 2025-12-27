@@ -61,14 +61,14 @@ func TestBuildSummary(t *testing.T) {
 
 func TestIntegrationDiffNoContainers(t *testing.T) {
 	if testing.Short() {
-		t.Skip(skipIntegrationMsg)
+		t.Skip(SkipIntegrationMsg)
 	}
 
-	client := skipIfNoDocker(t)
+	client := NewTestClient(t, testProjectName)
 	ctx := t.Context()
 
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, testComposeFile)
+	composePath := filepath.Join(dir, TestComposeFile)
 
 	content := `
 services:
@@ -111,14 +111,14 @@ services:
 
 func TestIntegrationDiffInSync(t *testing.T) {
 	if testing.Short() {
-		t.Skip(skipIntegrationMsg)
+		t.Skip(SkipIntegrationMsg)
 	}
 
-	client := skipIfNoDocker(t)
+	client := NewTestClient(t, testProjectName)
 	ctx := t.Context()
 
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, testComposeFile)
+	composePath := filepath.Join(dir, TestComposeFile)
 
 	content := `
 services:
@@ -156,14 +156,14 @@ services:
 
 func TestIntegrationDiffOrphanService(t *testing.T) {
 	if testing.Short() {
-		t.Skip(skipIntegrationMsg)
+		t.Skip(SkipIntegrationMsg)
 	}
 
-	client := skipIfNoDocker(t)
+	client := NewTestClient(t, testProjectName)
 	ctx := t.Context()
 
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, testComposeFile)
+	composePath := filepath.Join(dir, TestComposeFile)
 
 	content := `
 services:
