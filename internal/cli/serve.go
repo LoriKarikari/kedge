@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -35,10 +36,10 @@ var serveCmd = &cobra.Command{
 func init() {
 	serveCmd.Flags().StringVar(&serveFlags.repoURL, "repo", "", "Git repository URL (required)")
 	serveCmd.Flags().StringVar(&serveFlags.branch, "branch", "main", "Git branch to watch")
-	serveCmd.Flags().StringVar(&serveFlags.workDir, "workdir", "/var/lib/kedge/repo", "Working directory for git clone")
+	serveCmd.Flags().StringVar(&serveFlags.workDir, "workdir", ".kedge/repo", "Working directory for git clone")
 	serveCmd.Flags().StringVar(&serveFlags.composePath, "compose", "docker-compose.yaml", "Path to compose file relative to repo root")
 	serveCmd.Flags().StringVar(&serveFlags.projectName, "project", "kedge", "Docker compose project name")
-	serveCmd.Flags().StringVar(&serveFlags.statePath, "state", "/var/lib/kedge/state.db", "Path to state database")
+	serveCmd.Flags().StringVar(&serveFlags.statePath, "state", ".kedge/state.db", "Path to state database")
 	serveCmd.Flags().DurationVar(&serveFlags.pollInterval, "poll", time.Minute, "Git poll interval")
 	serveCmd.Flags().StringVar(&serveFlags.mode, "mode", "auto", "Reconcile mode: auto, notify, manual")
 
@@ -51,6 +52,10 @@ func init() {
 
 func runServe(cmd *cobra.Command, args []string) error {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	if err := os.MkdirAll(filepath.Dir(serveFlags.statePath), 0o750); err != nil {
+		return err
+	}
 
 	watcher := git.NewWatcher(serveFlags.repoURL, serveFlags.branch, serveFlags.workDir, serveFlags.pollInterval)
 

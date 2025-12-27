@@ -27,7 +27,7 @@ var statusCmd = &cobra.Command{
 func init() {
 	statusCmd.Flags().StringVar(&statusFlags.projectName, "project", "kedge", "Docker compose project name")
 	statusCmd.Flags().StringVar(&statusFlags.composePath, "compose", "docker-compose.yaml", "Path to compose file")
-	statusCmd.Flags().StringVar(&statusFlags.statePath, "state", "/var/lib/kedge/state.db", "Path to state database")
+	statusCmd.Flags().StringVar(&statusFlags.statePath, "state", ".kedge/state.db", "Path to state database")
 
 	rootCmd.AddCommand(statusCmd)
 }

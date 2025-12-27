@@ -29,7 +29,7 @@ var rollbackCmd = &cobra.Command{
 
 func init() {
 	rollbackCmd.Flags().StringVar(&rollbackFlags.projectName, "project", "kedge", "Docker compose project name")
-	rollbackCmd.Flags().StringVar(&rollbackFlags.statePath, "state", "/var/lib/kedge/state.db", "Path to state database")
+	rollbackCmd.Flags().StringVar(&rollbackFlags.statePath, "state", ".kedge/state.db", "Path to state database")
 
 	rootCmd.AddCommand(rollbackCmd)
 }

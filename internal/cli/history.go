@@ -22,7 +22,7 @@ var historyCmd = &cobra.Command{
 }
 
 func init() {
-	historyCmd.Flags().StringVar(&historyFlags.statePath, "state", "/var/lib/kedge/state.db", "Path to state database")
+	historyCmd.Flags().StringVar(&historyFlags.statePath, "state", ".kedge/state.db", "Path to state database")
 	historyCmd.Flags().IntVar(&historyFlags.limit, "limit", 10, "Maximum number of entries to show")
 
 	rootCmd.AddCommand(historyCmd)
