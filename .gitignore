@@ -61,4 +61,4 @@ debug
 __debug_bin*
 
 # Air (hot reload) tmp directory
-tmp/
+tmp/kedge

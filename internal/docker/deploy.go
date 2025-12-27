@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -145,7 +146,11 @@ func (c *Client) removeContainer(ctx context.Context, containerID string) error 
 	defer cancel()
 
 	c.logger.Info("removing container", "container", lo.Substring(containerID, 0, 12))
-	return c.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
+	err := c.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
+	if errdefs.IsConflict(err) {
+		return nil
+	}
+	return err
 }
 
 func (c *Client) createAndStartContainer(ctx context.Context, projectName, serviceName string, svc types.ServiceConfig, commit string) error {

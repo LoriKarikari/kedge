@@ -227,6 +227,10 @@ func (w *Watcher) LastCommit() string {
 	return w.lastCommit
 }
 
+func (w *Watcher) WorkDir() string {
+	return w.workDir
+}
+
 func (w *Watcher) updateLastCommit() error {
 	ref, err := w.repo.Head()
 	if err != nil {
