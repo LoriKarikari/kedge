@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -147,7 +147,7 @@ func (c *Client) removeContainer(ctx context.Context, containerID string) error 
 
 	c.logger.Info("removing container", "container", lo.Substring(containerID, 0, 12))
 	err := c.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
-	if err != nil && strings.Contains(err.Error(), "is already in progress") {
+	if errdefs.IsConflict(err) {
 		return nil
 	}
 	return err

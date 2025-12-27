@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"path/filepath"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/LoriKarikari/kedge/internal/git"
 	"github.com/LoriKarikari/kedge/internal/reconcile"
 	"github.com/LoriKarikari/kedge/internal/state"
+	"github.com/samber/lo"
 )
 
 type Config struct {
@@ -28,6 +30,10 @@ type Controller struct {
 }
 
 func New(ctx context.Context, watcher *git.Watcher, cfg Config, logger *slog.Logger) (*Controller, error) {
+	if filepath.IsAbs(cfg.ComposePath) {
+		return nil, fmt.Errorf("compose path must be relative: %s", cfg.ComposePath)
+	}
+
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -62,7 +68,7 @@ func (c *Controller) Run(ctx context.Context) error {
 	}
 
 	if err := c.loadAndReconcile(ctx, c.watcher.LastCommit()); err != nil {
-		c.logger.Error("initial reconcile failed", "error", err)
+		return fmt.Errorf("initial reconcile: %w", err)
 	}
 
 	c.watcher.Watch(ctx, func(event git.ChangeEvent) {
@@ -73,7 +79,7 @@ func (c *Controller) Run(ctx context.Context) error {
 }
 
 func (c *Controller) handleChange(ctx context.Context, event git.ChangeEvent) {
-	c.logger.Info("git change detected", "commit", event.Commit[:8], "message", event.Message)
+	c.logger.Info("git change detected", "commit", lo.Substring(event.Commit, 0, 8), "message", event.Message)
 
 	if err := c.loadAndReconcile(ctx, event.Commit); err != nil {
 		c.logger.Error("reconcile failed", "error", err)
