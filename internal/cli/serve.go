@@ -42,7 +42,9 @@ func init() {
 	serveCmd.Flags().DurationVar(&serveFlags.pollInterval, "poll", time.Minute, "Git poll interval")
 	serveCmd.Flags().StringVar(&serveFlags.mode, "mode", "auto", "Reconcile mode: auto, notify, manual")
 
-	_ = serveCmd.MarkFlagRequired("repo")
+	if err := serveCmd.MarkFlagRequired("repo"); err != nil {
+		panic(err)
+	}
 
 	rootCmd.AddCommand(serveCmd)
 }
