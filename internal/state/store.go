@@ -18,6 +18,8 @@ const (
 	StatusSuccess    DeploymentStatus = "success"
 	StatusFailed     DeploymentStatus = "failed"
 	StatusRolledBack DeploymentStatus = "rolled_back"
+
+	DefaultListLimit = 100
 )
 
 type Deployment struct {
@@ -117,7 +119,7 @@ func (s *Store) GetDeploymentByCommit(ctx context.Context, commit string) (*Depl
 
 func (s *Store) ListDeployments(ctx context.Context, limit int) ([]*Deployment, error) {
 	if limit <= 0 {
-		limit = 100
+		limit = DefaultListLimit
 	}
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, commit_hash, compose_content, deployed_at, status, message FROM deployments ORDER BY id DESC LIMIT ?`,
