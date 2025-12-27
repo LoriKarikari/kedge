@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -145,7 +146,11 @@ func (c *Client) removeContainer(ctx context.Context, containerID string) error 
 	defer cancel()
 
 	c.logger.Info("removing container", "container", lo.Substring(containerID, 0, 12))
-	return c.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
+	err := c.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
+	if err != nil && strings.Contains(err.Error(), "is already in progress") {
+		return nil
+	}
+	return err
 }
 
 func (c *Client) createAndStartContainer(ctx context.Context, projectName, serviceName string, svc types.ServiceConfig, commit string) error {
