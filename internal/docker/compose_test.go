@@ -7,14 +7,13 @@ import (
 )
 
 const (
-	testComposeFile = "docker-compose.yaml"
-	testProject     = "test-project"
-	testImageNginx  = "nginx:latest"
+	testProject    = "test-project"
+	testImageNginx = "nginx:latest"
 )
 
 func TestLoadProject(t *testing.T) {
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, testComposeFile)
+	composePath := filepath.Join(dir, TestComposeFile)
 
 	content := `
 services:
@@ -64,7 +63,7 @@ func TestLoadProjectInvalidFile(t *testing.T) {
 
 func TestServiceImages(t *testing.T) {
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, testComposeFile)
+	composePath := filepath.Join(dir, TestComposeFile)
 
 	content := `
 services:
@@ -94,7 +93,7 @@ services:
 
 func TestServiceNames(t *testing.T) {
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, testComposeFile)
+	composePath := filepath.Join(dir, TestComposeFile)
 
 	content := `
 services:

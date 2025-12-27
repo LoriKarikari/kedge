@@ -9,27 +9,8 @@ import (
 	"github.com/LoriKarikari/kedge/internal/docker"
 )
 
-const (
-	testComposeFile = "docker-compose.yaml"
-	skipMsg         = "skipping integration test"
-)
-
-func skipIfNoDocker(t *testing.T, projectName string) *docker.Client {
-	t.Helper()
-	client, err := docker.NewClient(projectName, nil)
-	if err != nil {
-		t.Skipf("docker not available: %v", err)
-	}
-	_ = client.Remove(t.Context())
-	t.Cleanup(func() {
-		_ = client.Remove(t.Context())
-		client.Close()
-	})
-	return client
-}
-
 func TestNewReconciler(t *testing.T) {
-	client := skipIfNoDocker(t, "kedge-test-new")
+	client := docker.NewTestClient(t, "kedge-test-new")
 
 	r := New(client, nil, Config{}, nil)
 
@@ -52,7 +33,7 @@ func TestReconcilerModes(t *testing.T) {
 		{ModeManual, ModeManual},
 	}
 
-	client := skipIfNoDocker(t, "kedge-test-modes")
+	client := docker.NewTestClient(t, "kedge-test-modes")
 
 	for _, tt := range tests {
 		t.Run(string(tt.mode), func(t *testing.T) {
@@ -66,15 +47,15 @@ func TestReconcilerModes(t *testing.T) {
 
 func TestIntegrationReconcileAutoMode(t *testing.T) {
 	if testing.Short() {
-		t.Skip(skipMsg)
+		t.Skip(docker.SkipIntegrationMsg)
 	}
 
 	const projectName = "kedge-test-auto"
-	client := skipIfNoDocker(t, projectName)
+	client := docker.NewTestClient(t, projectName)
 	ctx := t.Context()
 
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, testComposeFile)
+	composePath := filepath.Join(dir, docker.TestComposeFile)
 
 	content := `
 services:
@@ -114,15 +95,15 @@ services:
 
 func TestIntegrationReconcileNotifyMode(t *testing.T) {
 	if testing.Short() {
-		t.Skip(skipMsg)
+		t.Skip(docker.SkipIntegrationMsg)
 	}
 
 	const projectName = "kedge-test-notify"
-	client := skipIfNoDocker(t, projectName)
+	client := docker.NewTestClient(t, projectName)
 	ctx := t.Context()
 
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, testComposeFile)
+	composePath := filepath.Join(dir, docker.TestComposeFile)
 
 	content := `
 services:
@@ -165,15 +146,15 @@ services:
 
 func TestIntegrationSync(t *testing.T) {
 	if testing.Short() {
-		t.Skip(skipMsg)
+		t.Skip(docker.SkipIntegrationMsg)
 	}
 
 	const projectName = "kedge-test-sync"
-	client := skipIfNoDocker(t, projectName)
+	client := docker.NewTestClient(t, projectName)
 	ctx := t.Context()
 
 	dir := t.TempDir()
-	composePath := filepath.Join(dir, testComposeFile)
+	composePath := filepath.Join(dir, docker.TestComposeFile)
 
 	content := `
 services:

@@ -69,7 +69,7 @@ linters:
       - linters:
           - errcheck
           - gosec
-        path: _test\.go
+        path: (_test\.go|testing\.go)
       - linters:
           - all
         path: (^|/)vendor/
