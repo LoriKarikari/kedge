@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	z "github.com/Oudwins/zog"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
@@ -20,6 +21,17 @@ const (
 	ActionUpdate DiffAction = "update"
 	ActionRemove DiffAction = "remove"
 )
+
+var actionSchema = z.String().OneOf([]string{
+	string(ActionCreate),
+	string(ActionUpdate),
+	string(ActionRemove),
+})
+
+func (a DiffAction) IsValid() bool {
+	s := string(a)
+	return actionSchema.Validate(&s) == nil
+}
 
 type ServiceDiff struct {
 	Service      string

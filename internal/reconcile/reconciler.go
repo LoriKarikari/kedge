@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	z "github.com/Oudwins/zog"
+
 	"github.com/LoriKarikari/kedge/internal/docker"
 	"github.com/compose-spec/compose-go/v2/types"
 )
@@ -18,6 +20,19 @@ const (
 	ModeNotify Mode = "notify"
 	ModeManual Mode = "manual"
 )
+
+var modeSchema = z.String().OneOf([]string{
+	string(ModeAuto),
+	string(ModeNotify),
+	string(ModeManual),
+})
+
+var ErrInvalidMode = errors.New("invalid reconcile mode")
+
+func (m Mode) IsValid() bool {
+	s := string(m)
+	return modeSchema.Validate(&s) == nil
+}
 
 var errProjectNil = errors.New("project is nil")
 

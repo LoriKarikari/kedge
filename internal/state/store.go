@@ -34,12 +34,9 @@ var statusSchema = z.String().OneOf([]string{
 
 var ErrInvalidStatus = errors.New("invalid deployment status")
 
-func validateStatus(status DeploymentStatus) error {
-	s := string(status)
-	if errs := statusSchema.Validate(&s); errs != nil {
-		return ErrInvalidStatus
-	}
-	return nil
+func (s DeploymentStatus) IsValid() bool {
+	str := string(s)
+	return statusSchema.Validate(&str) == nil
 }
 
 type Deployment struct {
@@ -98,8 +95,8 @@ func (s *Store) Close() error {
 }
 
 func (s *Store) SaveDeployment(ctx context.Context, commit, composeContent string, status DeploymentStatus, message string) (*Deployment, error) {
-	if err := validateStatus(status); err != nil {
-		return nil, err
+	if !status.IsValid() {
+		return nil, ErrInvalidStatus
 	}
 	result, err := s.db.ExecContext(ctx,
 		`INSERT INTO deployments (commit_hash, compose_content, status, message) VALUES (?, ?, ?, ?)`,
@@ -166,8 +163,8 @@ func (s *Store) ListDeployments(ctx context.Context, limit int) ([]*Deployment, 
 }
 
 func (s *Store) UpdateDeploymentStatus(ctx context.Context, id int64, status DeploymentStatus, message string) error {
-	if err := validateStatus(status); err != nil {
-		return err
+	if !status.IsValid() {
+		return ErrInvalidStatus
 	}
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE deployments SET status = ?, message = ? WHERE id = ?`,
