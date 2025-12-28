@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/LoriKarikari/kedge/internal/docker"
 	"github.com/LoriKarikari/kedge/internal/reconcile"
@@ -14,6 +15,7 @@ import (
 var syncFlags struct {
 	projectName string
 	composePath string
+	workdir     string
 	force       bool
 }
 
@@ -26,7 +28,8 @@ var syncCmd = &cobra.Command{
 
 func init() {
 	syncCmd.Flags().StringVar(&syncFlags.projectName, "project", "kedge", "Docker compose project name")
-	syncCmd.Flags().StringVar(&syncFlags.composePath, "compose", "docker-compose.yaml", "Path to compose file")
+	syncCmd.Flags().StringVar(&syncFlags.composePath, "compose", "docker-compose.yaml", "Path to compose file relative to workdir")
+	syncCmd.Flags().StringVar(&syncFlags.workdir, "workdir", ".kedge/repo", "Working directory containing the compose file")
 	syncCmd.Flags().BoolVar(&syncFlags.force, "force", false, "Force sync even if no drift detected")
 
 	rootCmd.AddCommand(syncCmd)
@@ -42,7 +45,8 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 	defer client.Close()
 
-	project, err := docker.LoadProject(ctx, syncFlags.composePath, syncFlags.projectName)
+	composePath := filepath.Join(syncFlags.workdir, syncFlags.composePath)
+	project, err := docker.LoadProject(ctx, composePath, syncFlags.projectName)
 	if err != nil {
 		return fmt.Errorf("load compose: %w", err)
 	}

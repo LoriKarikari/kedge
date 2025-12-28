@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/LoriKarikari/kedge/internal/docker"
 	"github.com/spf13/cobra"
@@ -13,6 +14,7 @@ import (
 var diffFlags struct {
 	projectName string
 	composePath string
+	workdir     string
 }
 
 var diffCmd = &cobra.Command{
@@ -24,7 +26,8 @@ var diffCmd = &cobra.Command{
 
 func init() {
 	diffCmd.Flags().StringVar(&diffFlags.projectName, "project", "kedge", "Docker compose project name")
-	diffCmd.Flags().StringVar(&diffFlags.composePath, "compose", "docker-compose.yaml", "Path to compose file")
+	diffCmd.Flags().StringVar(&diffFlags.composePath, "compose", "docker-compose.yaml", "Path to compose file relative to workdir")
+	diffCmd.Flags().StringVar(&diffFlags.workdir, "workdir", ".kedge/repo", "Working directory containing the compose file")
 
 	rootCmd.AddCommand(diffCmd)
 }
@@ -39,7 +42,8 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	}
 	defer client.Close()
 
-	project, err := docker.LoadProject(ctx, diffFlags.composePath, diffFlags.projectName)
+	composePath := filepath.Join(diffFlags.workdir, diffFlags.composePath)
+	project, err := docker.LoadProject(ctx, composePath, diffFlags.projectName)
 	if err != nil {
 		return fmt.Errorf("load compose: %w", err)
 	}

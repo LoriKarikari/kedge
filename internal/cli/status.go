@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/LoriKarikari/kedge/internal/docker"
 	"github.com/LoriKarikari/kedge/internal/state"
@@ -15,6 +16,7 @@ var statusFlags struct {
 	projectName string
 	composePath string
 	statePath   string
+	workdir     string
 }
 
 var statusCmd = &cobra.Command{
@@ -26,8 +28,9 @@ var statusCmd = &cobra.Command{
 
 func init() {
 	statusCmd.Flags().StringVar(&statusFlags.projectName, "project", "kedge", "Docker compose project name")
-	statusCmd.Flags().StringVar(&statusFlags.composePath, "compose", "docker-compose.yaml", "Path to compose file")
+	statusCmd.Flags().StringVar(&statusFlags.composePath, "compose", "docker-compose.yaml", "Path to compose file relative to workdir")
 	statusCmd.Flags().StringVar(&statusFlags.statePath, "state", ".kedge/state.db", "Path to state database")
+	statusCmd.Flags().StringVar(&statusFlags.workdir, "workdir", ".kedge/repo", "Working directory containing the compose file")
 
 	rootCmd.AddCommand(statusCmd)
 }
@@ -42,7 +45,8 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 	defer client.Close()
 
-	project, err := docker.LoadProject(ctx, statusFlags.composePath, statusFlags.projectName)
+	composePath := filepath.Join(statusFlags.workdir, statusFlags.composePath)
+	project, err := docker.LoadProject(ctx, composePath, statusFlags.projectName)
 	if err != nil {
 		return fmt.Errorf("load compose: %w", err)
 	}
