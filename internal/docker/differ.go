@@ -119,6 +119,18 @@ func (c *Client) diffService(ctx context.Context, name string, desired types.Ser
 		}, nil
 	}
 
+	storedHash := actual.Labels[LabelConfigHash]
+	currentHash := ConfigHash(desired)
+	if storedHash != currentHash {
+		return &ServiceDiff{
+			Service:      name,
+			Action:       ActionUpdate,
+			DesiredImage: desired.Image,
+			CurrentImage: actual.Image,
+			Reason:       "config changed",
+		}, nil
+	}
+
 	return nil, nil
 }
 
