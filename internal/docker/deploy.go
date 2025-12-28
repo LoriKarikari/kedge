@@ -1,12 +1,14 @@
 package docker
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -279,26 +281,28 @@ func kedgeLabels(projectName, serviceName, commit string, svc types.ServiceConfi
 
 func ConfigHash(svc types.ServiceConfig) string {
 	cfg := struct {
-		Image       string
-		Command     []string
-		Entrypoint  []string
-		Environment map[string]*string
-		Ports       []types.ServicePortConfig
-		Volumes     []types.ServiceVolumeConfig
-		Networks    map[string]*types.ServiceNetworkConfig
-		WorkingDir  string
-		Restart     string
+		Image      string
+		Command    []string
+		Entrypoint []string
+		Env        []lo.Entry[string, *string]
+		Ports      []types.ServicePortConfig
+		Volumes    []types.ServiceVolumeConfig
+		Networks   []string
+		WorkingDir string
+		Restart    string
 	}{
-		Image:       svc.Image,
-		Command:     svc.Command,
-		Entrypoint:  svc.Entrypoint,
-		Environment: svc.Environment,
-		Ports:       svc.Ports,
-		Volumes:     svc.Volumes,
-		Networks:    svc.Networks,
-		WorkingDir:  svc.WorkingDir,
-		Restart:     svc.Restart,
+		Image:      svc.Image,
+		Command:    svc.Command,
+		Entrypoint: svc.Entrypoint,
+		Env:        lo.Entries(svc.Environment),
+		Ports:      svc.Ports,
+		Volumes:    svc.Volumes,
+		Networks:   lo.Keys(svc.Networks),
+		WorkingDir: svc.WorkingDir,
+		Restart:    svc.Restart,
 	}
+	slices.SortFunc(cfg.Env, func(a, b lo.Entry[string, *string]) int { return cmp.Compare(a.Key, b.Key) })
+	slices.Sort(cfg.Networks)
 
 	data, err := json.Marshal(cfg)
 	if err != nil {
