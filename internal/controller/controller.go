@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/LoriKarikari/kedge/internal/docker"
 	"github.com/LoriKarikari/kedge/internal/git"
@@ -58,9 +57,6 @@ func NewStandalone(ctx context.Context, cfg Config, logger *slog.Logger) (*Contr
 func newController(ctx context.Context, cfg Config, logger *slog.Logger) (*Controller, error) {
 	if filepath.IsAbs(cfg.ComposePath) {
 		return nil, fmt.Errorf("compose path must be relative: %s", cfg.ComposePath)
-	}
-	if strings.Contains(cfg.ComposePath, "..") {
-		return nil, fmt.Errorf("compose path must not contain '..': %s", cfg.ComposePath)
 	}
 
 	if logger == nil {
