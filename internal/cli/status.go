@@ -62,13 +62,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	fmt.Println("\n=== Last Deployment ===")
 	store, err := state.New(ctx, statusFlags.statePath)
 	if err != nil {
-		return nil
+		return err
 	}
 	defer store.Close()
-
-	fmt.Println("\n=== Last Deployment ===")
 	deployment, err := store.GetLastDeployment(ctx)
 	switch {
 	case err == state.ErrNotFound:
