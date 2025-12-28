@@ -3,14 +3,12 @@ package docker
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	z "github.com/Oudwins/zog"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
 	"github.com/samber/lo"
 )
 
@@ -158,58 +156,6 @@ func (c *Client) isImageChanged(ctx context.Context, desiredImage, actualImageID
 		return false, fmt.Errorf("inspect image %s: %w", desiredImage, err)
 	}
 	return inspect.ID != actualImageID, nil
-}
-
-func (c *Client) CheckForUpdates(ctx context.Context, project *types.Project) map[string]bool {
-	updates := make(map[string]bool)
-
-	for name := range project.Services {
-		svc := project.Services[name]
-		hasUpdate, err := c.checkImageUpdate(ctx, svc.Image)
-		if err != nil {
-			c.logger.Warn("failed to check image update", "service", name, "image", svc.Image, "error", err)
-			continue
-		}
-		updates[name] = hasUpdate
-	}
-
-	return updates
-}
-
-func (c *Client) checkImageUpdate(ctx context.Context, imageName string) (bool, error) {
-	inspectCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	defer cancel()
-
-	localInspect, err := c.cli.ImageInspect(inspectCtx, imageName)
-	if err != nil {
-		if errdefs.IsNotFound(err) {
-			return true, nil
-		}
-		return false, err
-	}
-
-	pullCtx, pullCancel := context.WithTimeout(ctx, pullTimeout)
-	defer pullCancel()
-
-	reader, err := c.cli.ImagePull(pullCtx, imageName, image.PullOptions{})
-	if err != nil {
-		return false, fmt.Errorf("pull image: %w", err)
-	}
-	defer reader.Close()
-
-	if _, err = io.Copy(io.Discard, reader); err != nil {
-		return false, err
-	}
-
-	reinspectCtx, reinspectCancel := context.WithTimeout(ctx, defaultTimeout)
-	defer reinspectCancel()
-
-	remoteInspect, err := c.cli.ImageInspect(reinspectCtx, imageName)
-	if err != nil {
-		return false, fmt.Errorf("inspect pulled image: %w", err)
-	}
-
-	return localInspect.ID != remoteInspect.ID, nil
 }
 
 func buildSummary(changes []ServiceDiff) string {

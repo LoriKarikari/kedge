@@ -18,6 +18,7 @@ import (
 type Config struct {
 	ProjectName  string
 	ComposePath  string
+	WorkDir      string
 	StatePath    string
 	ReconcileCfg reconcile.Config
 }
@@ -28,10 +29,33 @@ type Controller struct {
 	reconciler *reconcile.Reconciler
 	store      *state.Store
 	config     Config
+	workDir    string
 	logger     *slog.Logger
 }
 
 func New(ctx context.Context, watcher *git.Watcher, cfg Config, logger *slog.Logger) (*Controller, error) {
+	ctrl, err := newController(ctx, cfg, logger)
+	if err != nil {
+		return nil, err
+	}
+	ctrl.watcher = watcher
+	ctrl.workDir = watcher.WorkDir()
+	return ctrl, nil
+}
+
+func NewStandalone(ctx context.Context, cfg Config, logger *slog.Logger) (*Controller, error) {
+	if cfg.WorkDir == "" {
+		return nil, fmt.Errorf("workdir is required")
+	}
+	ctrl, err := newController(ctx, cfg, logger)
+	if err != nil {
+		return nil, err
+	}
+	ctrl.workDir = cfg.WorkDir
+	return ctrl, nil
+}
+
+func newController(ctx context.Context, cfg Config, logger *slog.Logger) (*Controller, error) {
 	if filepath.IsAbs(cfg.ComposePath) {
 		return nil, fmt.Errorf("compose path must be relative: %s", cfg.ComposePath)
 	}
@@ -58,7 +82,6 @@ func New(ctx context.Context, watcher *git.Watcher, cfg Config, logger *slog.Log
 	reconciler := reconcile.New(client, nil, cfg.ReconcileCfg, logger)
 
 	return &Controller{
-		watcher:    watcher,
 		client:     client,
 		reconciler: reconciler,
 		store:      store,
@@ -92,9 +115,11 @@ func (c *Controller) handleChange(ctx context.Context, event git.ChangeEvent) {
 }
 
 func (c *Controller) loadAndReconcile(ctx context.Context, commit string) error {
-	composePath := filepath.Join(c.watcher.WorkDir(), c.config.ComposePath)
+	if err := c.loadProject(ctx, commit); err != nil {
+		return err
+	}
 
-	root, err := os.OpenRoot(c.watcher.WorkDir())
+	root, err := os.OpenRoot(c.workDir)
 	if err != nil {
 		return fmt.Errorf("open work directory: %w", err)
 	}
@@ -104,14 +129,6 @@ func (c *Controller) loadAndReconcile(ctx context.Context, commit string) error 
 	if err != nil {
 		return fmt.Errorf("read compose file: %w", err)
 	}
-
-	project, err := docker.LoadProject(ctx, composePath, c.config.ProjectName)
-	if err != nil {
-		return err
-	}
-
-	c.reconciler.SetProject(project)
-	c.reconciler.SetCommit(commit)
 
 	deployment, err := c.store.SaveDeployment(ctx, commit, string(composeContent), state.StatusPending, "")
 	if err != nil {
@@ -139,9 +156,29 @@ func (c *Controller) loadAndReconcile(ctx context.Context, commit string) error 
 	return result.Error
 }
 
-func (c *Controller) Sync(ctx context.Context) error {
-	result := c.reconciler.Sync(ctx)
-	return result.Error
+func (c *Controller) loadProject(ctx context.Context, commit string) error {
+	composePath := filepath.Join(c.workDir, c.config.ComposePath)
+	project, err := docker.LoadProject(ctx, composePath, c.config.ProjectName)
+	if err != nil {
+		return err
+	}
+	c.reconciler.SetProject(project)
+	c.reconciler.SetCommit(commit)
+	return nil
+}
+
+func (c *Controller) Sync(ctx context.Context) (*reconcile.Result, error) {
+	if err := c.loadProject(ctx, ""); err != nil {
+		return nil, err
+	}
+	return c.reconciler.Sync(ctx), nil
+}
+
+func (c *Controller) Reconcile(ctx context.Context) (*reconcile.Result, error) {
+	if err := c.loadProject(ctx, ""); err != nil {
+		return nil, err
+	}
+	return c.reconciler.Reconcile(ctx), nil
 }
 
 func (c *Controller) Close() error {

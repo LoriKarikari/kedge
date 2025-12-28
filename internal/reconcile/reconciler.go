@@ -29,9 +29,11 @@ var modeSchema = z.String().OneOf([]string{
 
 var ErrInvalidMode = errors.New("invalid reconcile mode")
 
-func (m Mode) IsValid() bool {
-	s := string(m)
-	return modeSchema.Validate(&s) == nil
+func ParseMode(s string) (Mode, error) {
+	if err := modeSchema.Validate(&s); err != nil {
+		return "", ErrInvalidMode
+	}
+	return Mode(s), nil
 }
 
 var errProjectNil = errors.New("project is nil")

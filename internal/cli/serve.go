@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -57,13 +58,18 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	mode, err := reconcile.ParseMode(serveFlags.mode)
+	if err != nil {
+		return fmt.Errorf("invalid mode %q: must be one of auto, notify, manual", serveFlags.mode)
+	}
+
 	watcher := git.NewWatcher(serveFlags.repoURL, serveFlags.branch, serveFlags.workDir, serveFlags.pollInterval)
 
 	cfg := controller.Config{
 		ProjectName:  serveFlags.projectName,
 		ComposePath:  serveFlags.composePath,
 		StatePath:    serveFlags.statePath,
-		ReconcileCfg: reconcile.Config{Mode: reconcile.Mode(serveFlags.mode)},
+		ReconcileCfg: reconcile.Config{Mode: mode},
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

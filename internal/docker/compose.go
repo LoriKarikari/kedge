@@ -38,9 +38,3 @@ func LoadProject(ctx context.Context, composePath, projectName string) (*types.P
 func ServiceNames(project *types.Project) []string {
 	return lo.Keys(project.Services)
 }
-
-func ServiceImages(project *types.Project) map[string]string {
-	return lo.MapValues(project.Services, func(svc types.ServiceConfig, _ string) string {
-		return svc.Image
-	})
-}
