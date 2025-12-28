@@ -83,8 +83,10 @@ func (c *Client) deployService(ctx context.Context, projectName, serviceName str
 	}
 
 	if existing != nil {
-		if existing.ImageID == imageID && existing.State == "running" {
-			c.logger.Info("service already running with correct image", "service", serviceName)
+		storedHash := existing.Labels[LabelConfigHash]
+		currentHash := ConfigHash(svc)
+		if existing.ImageID == imageID && existing.State == "running" && storedHash == currentHash {
+			c.logger.Info("service already running with correct config", "service", serviceName)
 			return nil
 		}
 		if err := c.removeContainer(ctx, existing.ID); err != nil {
