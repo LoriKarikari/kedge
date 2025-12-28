@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/LoriKarikari/kedge/internal/docker"
 	"github.com/LoriKarikari/kedge/internal/git"
@@ -32,6 +34,9 @@ type Controller struct {
 func New(ctx context.Context, watcher *git.Watcher, cfg Config, logger *slog.Logger) (*Controller, error) {
 	if filepath.IsAbs(cfg.ComposePath) {
 		return nil, fmt.Errorf("compose path must be relative: %s", cfg.ComposePath)
+	}
+	if strings.Contains(cfg.ComposePath, "..") {
+		return nil, fmt.Errorf("compose path must not contain '..': %s", cfg.ComposePath)
 	}
 
 	if logger == nil {
@@ -88,6 +93,18 @@ func (c *Controller) handleChange(ctx context.Context, event git.ChangeEvent) {
 
 func (c *Controller) loadAndReconcile(ctx context.Context, commit string) error {
 	composePath := filepath.Join(c.watcher.WorkDir(), c.config.ComposePath)
+
+	root, err := os.OpenRoot(c.watcher.WorkDir())
+	if err != nil {
+		return fmt.Errorf("open work directory: %w", err)
+	}
+	defer root.Close()
+
+	composeContent, err := root.ReadFile(c.config.ComposePath)
+	if err != nil {
+		return fmt.Errorf("read compose file: %w", err)
+	}
+
 	project, err := docker.LoadProject(ctx, composePath, c.config.ProjectName)
 	if err != nil {
 		return err
@@ -96,7 +113,7 @@ func (c *Controller) loadAndReconcile(ctx context.Context, commit string) error 
 	c.reconciler.SetProject(project)
 	c.reconciler.SetCommit(commit)
 
-	deployment, err := c.store.SaveDeployment(ctx, commit, "", state.StatusPending, "")
+	deployment, err := c.store.SaveDeployment(ctx, commit, string(composeContent), state.StatusPending, "")
 	if err != nil {
 		c.logger.Warn("failed to save deployment", "error", err)
 	}
