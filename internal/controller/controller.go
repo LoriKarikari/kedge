@@ -121,11 +121,17 @@ func (c *Controller) loadAndReconcile(ctx context.Context, commit string) error 
 	result := c.reconciler.Reconcile(ctx)
 
 	if deployment != nil {
-		status := state.StatusSuccess
-		message := ""
-		if result.Error != nil {
+		var status state.DeploymentStatus
+		var message string
+		switch {
+		case result.Error != nil:
 			status = state.StatusFailed
 			message = result.Error.Error()
+		case result.Reconciled:
+			status = state.StatusSuccess
+		default:
+			status = state.StatusSkipped
+			message = "no changes applied"
 		}
 		if err := c.store.UpdateDeploymentStatus(ctx, deployment.ID, status, message); err != nil {
 			c.logger.Warn("failed to update deployment status", "error", err)

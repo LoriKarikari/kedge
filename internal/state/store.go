@@ -18,6 +18,7 @@ const (
 	StatusPending    DeploymentStatus = "pending"
 	StatusSuccess    DeploymentStatus = "success"
 	StatusFailed     DeploymentStatus = "failed"
+	StatusSkipped    DeploymentStatus = "skipped"
 	StatusRolledBack DeploymentStatus = "rolled_back"
 
 	DefaultListLimit = 100
@@ -27,6 +28,7 @@ var statusSchema = z.String().OneOf([]string{
 	string(StatusPending),
 	string(StatusSuccess),
 	string(StatusFailed),
+	string(StatusSkipped),
 	string(StatusRolledBack),
 })
 
