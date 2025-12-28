@@ -16,5 +16,6 @@ const (
 	LabelProject     = "io.kedge.project"
 	LabelService     = "io.kedge.service"
 	LabelCommit      = "io.kedge.commit"
+	LabelConfigHash  = "io.kedge.config-hash"
 	LabelComposeFile = "com.docker.compose.project.config_files"
 )

@@ -1,9 +1,14 @@
 package docker
 
 import (
+	"cmp"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -61,7 +66,7 @@ func (c *Client) ensureNetwork(ctx context.Context, name string) error {
 	}
 
 	_, err = c.cli.NetworkCreate(ctx, name, network.CreateOptions{
-		Labels: kedgeLabels(c.projectName, "", ""),
+		Labels: kedgeLabels(c.projectName, "", "", types.ServiceConfig{}),
 	})
 	return err
 }
@@ -80,8 +85,10 @@ func (c *Client) deployService(ctx context.Context, projectName, serviceName str
 	}
 
 	if existing != nil {
-		if existing.ImageID == imageID && existing.State == "running" {
-			c.logger.Info("service already running with correct image", "service", serviceName)
+		storedHash := existing.Labels[LabelConfigHash]
+		currentHash := ConfigHash(svc)
+		if existing.ImageID == imageID && existing.State == "running" && storedHash == currentHash {
+			c.logger.Info("service already running with correct config", "service", serviceName)
 			return nil
 		}
 		if err := c.removeContainer(ctx, existing.ID); err != nil {
@@ -154,7 +161,7 @@ func (c *Client) removeContainer(ctx context.Context, containerID string) error 
 }
 
 func (c *Client) createAndStartContainer(ctx context.Context, projectName, serviceName string, svc types.ServiceConfig, commit string) error {
-	labels := lo.Assign(svc.Labels, kedgeLabels(projectName, serviceName, commit))
+	labels := lo.Assign(svc.Labels, kedgeLabels(projectName, serviceName, commit, svc))
 
 	exposedPorts, portBindings := c.buildPortMappings(svc.Ports)
 
@@ -262,11 +269,45 @@ func containerName(projectName, serviceName string) string {
 	return fmt.Sprintf("%s-%s-1", projectName, serviceName)
 }
 
-func kedgeLabels(projectName, serviceName, commit string) map[string]string {
+func kedgeLabels(projectName, serviceName, commit string, svc types.ServiceConfig) map[string]string {
 	return lo.OmitByValues(map[string]string{
-		LabelManaged: "true",
-		LabelProject: projectName,
-		LabelService: serviceName,
-		LabelCommit:  commit,
+		LabelManaged:    "true",
+		LabelProject:    projectName,
+		LabelService:    serviceName,
+		LabelCommit:     commit,
+		LabelConfigHash: ConfigHash(svc),
 	}, []string{""})
+}
+
+func ConfigHash(svc types.ServiceConfig) string {
+	cfg := struct {
+		Image      string
+		Command    []string
+		Entrypoint []string
+		Env        []lo.Entry[string, *string]
+		Ports      []types.ServicePortConfig
+		Volumes    []types.ServiceVolumeConfig
+		Networks   []string
+		WorkingDir string
+		Restart    string
+	}{
+		Image:      svc.Image,
+		Command:    svc.Command,
+		Entrypoint: svc.Entrypoint,
+		Env:        lo.Entries(svc.Environment),
+		Ports:      svc.Ports,
+		Volumes:    svc.Volumes,
+		Networks:   lo.Keys(svc.Networks),
+		WorkingDir: svc.WorkingDir,
+		Restart:    svc.Restart,
+	}
+	slices.SortFunc(cfg.Env, func(a, b lo.Entry[string, *string]) int { return cmp.Compare(a.Key, b.Key) })
+	slices.Sort(cfg.Networks)
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return ""
+	}
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:8])
 }

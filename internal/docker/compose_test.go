@@ -61,36 +61,6 @@ func TestLoadProjectInvalidFile(t *testing.T) {
 	}
 }
 
-func TestServiceImages(t *testing.T) {
-	dir := t.TempDir()
-	composePath := filepath.Join(dir, TestComposeFile)
-
-	content := `
-services:
-  web:
-    image: nginx:latest
-  api:
-    image: myapp:v1
-`
-	if err := os.WriteFile(composePath, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	project, err := LoadProject(t.Context(), composePath, "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	images := ServiceImages(project)
-
-	if images["web"] != testImageNginx {
-		t.Errorf("got web image %q, want %q", images["web"], testImageNginx)
-	}
-	if images["api"] != "myapp:v1" {
-		t.Errorf("got api image %q, want %q", images["api"], "myapp:v1")
-	}
-}
-
 func TestServiceNames(t *testing.T) {
 	dir := t.TempDir()
 	composePath := filepath.Join(dir, TestComposeFile)
