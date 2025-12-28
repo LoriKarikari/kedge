@@ -206,13 +206,10 @@ func buildSummary(changes []ServiceDiff) string {
 	}
 
 	counts := lo.CountValuesBy(changes, func(d ServiceDiff) DiffAction { return d.Action })
-
-	var parts []string
-	for _, action := range []DiffAction{ActionCreate, ActionUpdate, ActionRemove} {
-		if count := counts[action]; count > 0 {
-			parts = append(parts, fmt.Sprintf("%d to %s", count, action))
-		}
-	}
+	parts := lo.FilterMap([]DiffAction{ActionCreate, ActionUpdate, ActionRemove}, func(action DiffAction, _ int) (string, bool) {
+		count := counts[action]
+		return fmt.Sprintf("%d to %s", count, action), count > 0
+	})
 
 	return strings.Join(parts, ", ")
 }
