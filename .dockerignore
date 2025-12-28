@@ -1,0 +1,12 @@
+.git
+.gitignore
+.kedge
+*.md
+*.yaml
+*.yml
+Dockerfile
+Makefile
+LICENSE
+docs/
+*.toml
+.github/
