@@ -95,11 +95,37 @@ func (c *Controller) Run(ctx context.Context) error {
 		return fmt.Errorf("initial reconcile: %w", err)
 	}
 
+	go c.watchDrift(ctx)
+
 	c.watcher.Watch(ctx, func(event git.ChangeEvent) {
 		c.handleChange(ctx, event)
 	})
 
 	return nil
+}
+
+func (c *Controller) watchDrift(ctx context.Context) {
+	results := make(chan *reconcile.Result)
+	go c.reconciler.Watch(ctx, results)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case result := <-results:
+			c.handleDriftResult(result)
+		}
+	}
+}
+
+func (c *Controller) handleDriftResult(result *reconcile.Result) {
+	if result.Error != nil {
+		c.logger.Error("drift check failed", "error", result.Error)
+		return
+	}
+	if result.Reconciled {
+		c.logger.Info("drift reconciled", "changes", len(result.Changes))
+	}
 }
 
 func (c *Controller) handleChange(ctx context.Context, event git.ChangeEvent) {
