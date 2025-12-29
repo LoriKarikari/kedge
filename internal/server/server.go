@@ -111,7 +111,3 @@ func (s *Server) Start(ctx context.Context) error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
-
-func (s *Server) Addr() string {
-	return s.server.Addr
-}
