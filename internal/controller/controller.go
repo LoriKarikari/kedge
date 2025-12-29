@@ -30,6 +30,7 @@ type Controller struct {
 	config     Config
 	workDir    string
 	logger     *slog.Logger
+	ready      bool
 }
 
 func New(ctx context.Context, watcher *git.Watcher, cfg Config, logger *slog.Logger) (*Controller, error) {
@@ -95,6 +96,8 @@ func (c *Controller) Run(ctx context.Context) error {
 		return fmt.Errorf("initial reconcile: %w", err)
 	}
 
+	c.ready = true
+
 	go c.watchDrift(ctx)
 
 	c.watcher.Watch(ctx, func(event git.ChangeEvent) {
@@ -102,6 +105,10 @@ func (c *Controller) Run(ctx context.Context) error {
 	})
 
 	return nil
+}
+
+func (c *Controller) IsReady() bool {
+	return c.ready
 }
 
 func (c *Controller) watchDrift(ctx context.Context) {

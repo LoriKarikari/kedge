@@ -13,6 +13,7 @@ import (
 	"github.com/LoriKarikari/kedge/internal/controller"
 	"github.com/LoriKarikari/kedge/internal/git"
 	"github.com/LoriKarikari/kedge/internal/reconcile"
+	"github.com/LoriKarikari/kedge/internal/server"
 	"github.com/spf13/cobra"
 )
 
@@ -89,6 +90,17 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer ctrl.Close()
+
+	srv := server.New(cfg.Server.Port, ctrl, logger)
+	if err := srv.Start(ctx); err != nil {
+		return fmt.Errorf("start server: %w", err)
+	}
+	defer func() {
+		if err := srv.Shutdown(context.Background()); err != nil {
+			logger.Error("server shutdown error", "error", err)
+		}
+	}()
+	slog.Info("server started", "port", cfg.Server.Port)
 
 	slog.Info("starting kedge", "repo", repoURL, "branch", branch, "mode", modeStr)
 
