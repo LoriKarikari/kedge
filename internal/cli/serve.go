@@ -96,7 +96,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("start server: %w", err)
 	}
 	defer func() {
-		if err := srv.Shutdown(context.Background()); err != nil {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownCancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
 			logger.Error("server shutdown error", "error", err)
 		}
 	}()
