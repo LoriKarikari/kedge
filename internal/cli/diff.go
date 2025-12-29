@@ -3,8 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"os"
 	"path/filepath"
 
 	"github.com/LoriKarikari/kedge/internal/docker"
@@ -34,7 +32,6 @@ func init() {
 
 func runDiff(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	client, err := docker.NewClient(diffFlags.projectName, logger)
 	if err != nil {

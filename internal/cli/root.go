@@ -1,13 +1,18 @@
 package cli
 
 import (
+	"log/slog"
 	"os"
 
 	"github.com/LoriKarikari/kedge/internal/config"
+	"github.com/LoriKarikari/kedge/internal/logging"
 	"github.com/spf13/cobra"
 )
 
-var cfg *config.Config
+var (
+	cfg    *config.Config
+	logger *slog.Logger
+)
 
 var rootCmd = &cobra.Command{
 	Use:   "kedge",
@@ -20,7 +25,15 @@ var rootCmd = &cobra.Command{
 		} else {
 			cfg = config.Default()
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		logger = logging.New(logging.Config{
+			Level:  cfg.Logging.Level,
+			Format: cfg.Logging.Format,
+		})
+		slog.SetDefault(logger)
+		return nil
 	},
 }
 

@@ -46,8 +46,7 @@ type Logging struct {
 }
 
 type Server struct {
-	Enabled bool `yaml:"enabled"`
-	Port    int  `yaml:"port"`
+	Port int `yaml:"port"`
 }
 
 func Default() *Config {
@@ -73,8 +72,7 @@ func Default() *Config {
 			Format: "text",
 		},
 		Server: Server{
-			Enabled: false,
-			Port:    8080,
+			Port: 8080,
 		},
 	}
 }

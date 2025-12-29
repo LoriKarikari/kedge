@@ -6,6 +6,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - kedge-data:/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kedge", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   kedge-data:

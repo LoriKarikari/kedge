@@ -126,7 +126,7 @@ func TestWatcherCloneAndPull(t *testing.T) {
 	tr := setupTestRepo(t)
 
 	workDir := filepath.Join(tr.tmpDir, testWorkDir)
-	w := NewWatcher(tr.bareRepoPath, "master", workDir, time.Second)
+	w := NewWatcher(tr.bareRepoPath, "master", workDir, time.Second, nil)
 
 	ctx := t.Context()
 	if err := w.Clone(ctx); err != nil {
@@ -167,7 +167,7 @@ func TestWatcherCloneExistingWorkDir(t *testing.T) {
 	tr := setupTestRepo(t)
 
 	workDir := filepath.Join(tr.tmpDir, testWorkDir)
-	w := NewWatcher(tr.bareRepoPath, "master", workDir, time.Second)
+	w := NewWatcher(tr.bareRepoPath, "master", workDir, time.Second, nil)
 
 	ctx := t.Context()
 	if err := w.Clone(ctx); err != nil {
@@ -176,7 +176,7 @@ func TestWatcherCloneExistingWorkDir(t *testing.T) {
 
 	firstCommit := w.LastCommit()
 
-	w2 := NewWatcher(tr.bareRepoPath, "master", workDir, time.Second)
+	w2 := NewWatcher(tr.bareRepoPath, "master", workDir, time.Second, nil)
 	if err := w2.Clone(ctx); err != nil {
 		t.Fatalf(testCloneFailedFmt, err)
 	}
@@ -199,7 +199,7 @@ func TestWatcherCloneNonGitDir(t *testing.T) {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
-	w := NewWatcher("https://github.com/example/repo.git", "main", workDir, time.Second)
+	w := NewWatcher("https://github.com/example/repo.git", "main", workDir, time.Second, nil)
 
 	err := w.Clone(t.Context())
 	if err == nil {
@@ -224,7 +224,7 @@ func TestWatcherWatch(t *testing.T) {
 
 	pollInterval := 50 * time.Millisecond
 	workDir := filepath.Join(tr.tmpDir, testWorkDir)
-	w := NewWatcher(tr.bareRepoPath, "master", workDir, pollInterval)
+	w := NewWatcher(tr.bareRepoPath, "master", workDir, pollInterval, nil)
 
 	ctx := t.Context()
 
@@ -260,7 +260,7 @@ func TestWatcherWatchBackpressure(t *testing.T) {
 
 	pollInterval := 50 * time.Millisecond
 	workDir := filepath.Join(tr.tmpDir, testWorkDir)
-	w := NewWatcher(tr.bareRepoPath, "master", workDir, pollInterval)
+	w := NewWatcher(tr.bareRepoPath, "master", workDir, pollInterval, nil)
 
 	ctx := t.Context()
 
@@ -319,7 +319,7 @@ func TestWatcherWatchPanicRecovery(t *testing.T) {
 	tr := setupTestRepo(t)
 
 	workDir := filepath.Join(tr.tmpDir, testWorkDir)
-	w := NewWatcher(tr.bareRepoPath, "master", workDir, 50*time.Millisecond)
+	w := NewWatcher(tr.bareRepoPath, "master", workDir, 50*time.Millisecond, nil)
 
 	ctx := t.Context()
 
@@ -357,7 +357,7 @@ func TestWatcherIntegrationCloneFromGitHub(t *testing.T) {
 	}
 
 	workDir := filepath.Join(t.TempDir(), "repo")
-	w := NewWatcher("https://github.com/octocat/Hello-World.git", "master", workDir, time.Second)
+	w := NewWatcher("https://github.com/octocat/Hello-World.git", "master", workDir, time.Second, nil)
 
 	ctx := t.Context()
 
@@ -393,7 +393,7 @@ func TestWatcherHardResetOnDirtyWorktree(t *testing.T) {
 	tr := setupTestRepo(t)
 
 	workDir := filepath.Join(tr.tmpDir, testWorkDir)
-	w := NewWatcher(tr.bareRepoPath, "master", workDir, time.Second)
+	w := NewWatcher(tr.bareRepoPath, "master", workDir, time.Second, nil)
 
 	ctx := t.Context()
 	if err := w.Clone(ctx); err != nil {

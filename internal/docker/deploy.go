@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"slices"
 	"time"
 
@@ -24,7 +25,7 @@ import (
 const pullTimeout = 5 * time.Minute
 
 func (c *Client) Deploy(ctx context.Context, project *types.Project, commit string) error {
-	c.logger.Info("deploying project", "services", len(project.Services))
+	c.logger.Info("deploying project", slog.Int("services", len(project.Services)))
 
 	if err := c.ensureNetworks(ctx, project); err != nil {
 		return err
@@ -77,7 +78,7 @@ func (c *Client) ensureNetwork(ctx context.Context, name string) error {
 }
 
 func (c *Client) deployService(ctx context.Context, projectName, serviceName string, svc types.ServiceConfig, commit string) error {
-	c.logger.Info("deploying service", "service", serviceName, "image", svc.Image)
+	c.logger.Info("deploying service", slog.String("service", serviceName), slog.String("image", svc.Image))
 
 	imageID, err := c.pullImage(ctx, svc.Image)
 	if err != nil {
@@ -93,7 +94,7 @@ func (c *Client) deployService(ctx context.Context, projectName, serviceName str
 		storedHash := existing.Labels[LabelConfigHash]
 		currentHash := ConfigHash(svc)
 		if existing.ImageID == imageID && existing.State == "running" && storedHash == currentHash {
-			c.logger.Info("service already running with correct config", "service", serviceName)
+			c.logger.Info("service already running with correct config", slog.String("service", serviceName))
 			return nil
 		}
 		if err := c.removeContainer(ctx, existing.ID); err != nil {
@@ -108,7 +109,7 @@ func (c *Client) pullImage(ctx context.Context, imageName string) (string, error
 	pullCtx, cancel := context.WithTimeout(ctx, pullTimeout)
 	defer cancel()
 
-	c.logger.Info("pulling image", "image", imageName)
+	c.logger.Info("pulling image", slog.String("image", imageName))
 
 	reader, err := c.cli.ImagePull(pullCtx, imageName, image.PullOptions{})
 	if err != nil {
@@ -157,7 +158,7 @@ func (c *Client) removeContainer(ctx context.Context, containerID string) error 
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	c.logger.Info("removing container", "container", lo.Substring(containerID, 0, 12))
+	c.logger.Info("removing container", slog.String("container", lo.Substring(containerID, 0, 12)))
 	err := c.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
 	if errdefs.IsConflict(err) {
 		return nil
@@ -199,7 +200,7 @@ func (c *Client) createAndStartContainer(ctx context.Context, projectName, servi
 		return fmt.Errorf("create container: %w", err)
 	}
 
-	c.logger.Info("created container", "container", lo.Substring(resp.ID, 0, 12), "service", serviceName)
+	c.logger.Info("created container", slog.String("container", lo.Substring(resp.ID, 0, 12)), slog.String("service", serviceName))
 
 	if err := c.connectToNetworks(ctx, resp.ID, serviceName, svc, projectName); err != nil {
 		return err
@@ -212,7 +213,7 @@ func (c *Client) createAndStartContainer(ctx context.Context, projectName, servi
 		return fmt.Errorf("start container: %w", err)
 	}
 
-	c.logger.Info("started container", "container", lo.Substring(resp.ID, 0, 12), "service", serviceName)
+	c.logger.Info("started container", slog.String("container", lo.Substring(resp.ID, 0, 12)), slog.String("service", serviceName))
 	return nil
 }
 
@@ -247,7 +248,7 @@ func (c *Client) buildPortMappings(ports []types.ServicePortConfig) (nat.PortSet
 	for _, p := range ports {
 		port, err := nat.NewPort(p.Protocol, fmt.Sprintf("%d", p.Target))
 		if err != nil {
-			c.logger.Warn("invalid port config, skipping", "port", p.Target, "protocol", p.Protocol, "error", err)
+			c.logger.Warn("invalid port config, skipping", slog.Uint64("port", uint64(p.Target)), slog.String("protocol", p.Protocol), slog.Any("error", err))
 			continue
 		}
 		exposedPorts[port] = struct{}{}

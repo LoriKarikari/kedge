@@ -25,17 +25,22 @@ type Watcher struct {
 	workDir      string
 	pollInterval time.Duration
 	repo         *git.Repository
+	logger       *slog.Logger
 
 	mu         sync.RWMutex
 	lastCommit string
 }
 
-func NewWatcher(repoURL, branch, workDir string, pollInterval time.Duration) *Watcher {
+func NewWatcher(repoURL, branch, workDir string, pollInterval time.Duration, logger *slog.Logger) *Watcher {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &Watcher{
 		repoURL:      repoURL,
 		branch:       branch,
 		workDir:      workDir,
 		pollInterval: pollInterval,
+		logger:       logger.With(slog.String("component", "watcher")),
 	}
 }
 
@@ -91,7 +96,7 @@ func (w *Watcher) Pull(ctx context.Context) (changed bool, hash string, err erro
 
 	if isRecoverableError(err) {
 		if resetErr := w.hardReset(ctx); resetErr != nil {
-			slog.Warn("hard reset failed", "error", resetErr)
+			w.logger.Warn("hard reset failed", slog.Any("error", resetErr))
 			return false, "", err
 		}
 		if err := w.updateLastCommit(); err != nil {
@@ -172,7 +177,7 @@ func (w *Watcher) runEventHandler(ctx context.Context, events <-chan ChangeEvent
 func (w *Watcher) safeCallHandler(onChange func(ChangeEvent), event ChangeEvent) {
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Error("panic in onChange handler", "error", r)
+			w.logger.Error("panic in onChange handler", slog.Any("error", r))
 		}
 	}()
 	onChange(event)
@@ -192,7 +197,7 @@ func (w *Watcher) pollLoop(ctx context.Context, ticker *time.Ticker, events chan
 func (w *Watcher) handleTick(ctx context.Context, events chan<- ChangeEvent) {
 	changed, hash, err := w.Pull(ctx)
 	if err != nil {
-		slog.Error("failed to pull", "error", err)
+		w.logger.Error("failed to pull", slog.Any("error", err))
 		return
 	}
 
@@ -216,7 +221,7 @@ func (w *Watcher) enqueueEvent(ctx context.Context, events chan<- ChangeEvent, e
 		case <-ctx.Done():
 			return
 		case <-time.After(w.pollInterval):
-			slog.Warn("event queue full; waiting for handler", "commit", event.Commit)
+			w.logger.Warn("event queue full; waiting for handler", slog.String("commit", event.Commit))
 		}
 	}
 }

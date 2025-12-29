@@ -19,7 +19,7 @@ func NewClient(projectName string, logger *slog.Logger) (*Client, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	logger = logger.With("component", "docker", "project", projectName)
+	logger = logger.With(slog.String("component", "docker"), slog.String("project", projectName))
 
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {

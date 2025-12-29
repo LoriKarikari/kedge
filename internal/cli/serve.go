@@ -13,6 +13,7 @@ import (
 	"github.com/LoriKarikari/kedge/internal/controller"
 	"github.com/LoriKarikari/kedge/internal/git"
 	"github.com/LoriKarikari/kedge/internal/reconcile"
+	"github.com/LoriKarikari/kedge/internal/server"
 	"github.com/spf13/cobra"
 )
 
@@ -61,8 +62,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("repo URL required: use --repo flag or set git.url in kedge.yaml")
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
 	if err := os.MkdirAll(filepath.Dir(statePath), 0o750); err != nil {
 		return err
 	}
@@ -72,7 +71,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid mode %q: must be one of auto, notify, manual", modeStr)
 	}
 
-	watcher := git.NewWatcher(repoURL, branch, workDir, pollInterval)
+	watcher := git.NewWatcher(repoURL, branch, workDir, pollInterval, logger)
 
 	ctrlCfg := controller.Config{
 		ProjectName:  projectName,
@@ -90,7 +89,20 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	defer ctrl.Close()
 
-	slog.Info("starting kedge", "repo", repoURL, "branch", branch, "mode", modeStr)
+	srv := server.New(cfg.Server.Port, ctrl, logger)
+	if err := srv.Start(ctx); err != nil {
+		return fmt.Errorf("start server: %w", err)
+	}
+	defer func() {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownCancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			logger.Error("server shutdown error", slog.Any("error", err))
+		}
+	}()
+	logger.Info("server started", slog.Int("port", cfg.Server.Port))
+
+	logger.Info("starting kedge", slog.String("repo", repoURL), slog.String("branch", branch), slog.String("mode", modeStr))
 
 	return ctrl.Run(ctx)
 }

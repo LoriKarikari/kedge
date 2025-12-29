@@ -30,6 +30,7 @@ type Controller struct {
 	config     Config
 	workDir    string
 	logger     *slog.Logger
+	ready      bool
 }
 
 func New(ctx context.Context, watcher *git.Watcher, cfg Config, logger *slog.Logger) (*Controller, error) {
@@ -62,7 +63,7 @@ func newController(ctx context.Context, cfg Config, logger *slog.Logger) (*Contr
 	if logger == nil {
 		logger = slog.Default()
 	}
-	logger = logger.With("component", "controller")
+	logger = logger.With(slog.String("component", "controller"))
 
 	client, err := docker.NewClient(cfg.ProjectName, logger)
 	if err != nil {
@@ -95,6 +96,8 @@ func (c *Controller) Run(ctx context.Context) error {
 		return fmt.Errorf("initial reconcile: %w", err)
 	}
 
+	c.ready = true
+
 	go c.watchDrift(ctx)
 
 	c.watcher.Watch(ctx, func(event git.ChangeEvent) {
@@ -102,6 +105,10 @@ func (c *Controller) Run(ctx context.Context) error {
 	})
 
 	return nil
+}
+
+func (c *Controller) IsReady() bool {
+	return c.ready
 }
 
 func (c *Controller) watchDrift(ctx context.Context) {
@@ -120,19 +127,19 @@ func (c *Controller) watchDrift(ctx context.Context) {
 
 func (c *Controller) handleDriftResult(result *reconcile.Result) {
 	if result.Error != nil {
-		c.logger.Error("drift check failed", "error", result.Error)
+		c.logger.Error("drift check failed", slog.Any("error", result.Error))
 		return
 	}
 	if result.Reconciled {
-		c.logger.Info("drift reconciled", "changes", len(result.Changes))
+		c.logger.Info("drift reconciled", slog.Int("changes", len(result.Changes)))
 	}
 }
 
 func (c *Controller) handleChange(ctx context.Context, event git.ChangeEvent) {
-	c.logger.Info("git change detected", "commit", lo.Substring(event.Commit, 0, 8), "message", event.Message)
+	c.logger.Info("git change detected", slog.String("commit", lo.Substring(event.Commit, 0, 8)), slog.String("message", event.Message))
 
 	if err := c.loadAndReconcile(ctx, event.Commit); err != nil {
-		c.logger.Error("reconcile failed", "error", err)
+		c.logger.Error("reconcile failed", slog.Any("error", err))
 	}
 }
 
@@ -154,7 +161,7 @@ func (c *Controller) loadAndReconcile(ctx context.Context, commit string) error 
 
 	deployment, err := c.store.SaveDeployment(ctx, commit, string(composeContent), state.StatusPending, "")
 	if err != nil {
-		c.logger.Warn("failed to save deployment", "error", err)
+		c.logger.Warn("failed to save deployment", slog.Any("error", err))
 	}
 
 	result := c.reconciler.Reconcile(ctx)
@@ -171,7 +178,7 @@ func (c *Controller) loadAndReconcile(ctx context.Context, commit string) error 
 			status, message = state.StatusSkipped, "no changes applied"
 		}
 		if err := c.store.UpdateDeploymentStatus(ctx, deployment.ID, status, message); err != nil {
-			c.logger.Warn("failed to update deployment status", "error", err)
+			c.logger.Warn("failed to update deployment status", slog.Any("error", err))
 		}
 	}
 

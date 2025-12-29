@@ -36,7 +36,6 @@ func init() {
 
 func runRollback(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	commitPrefix := args[0]
 
 	store, err := state.New(ctx, rollbackFlags.statePath)
@@ -80,7 +79,7 @@ func runRollback(cmd *cobra.Command, args []string) error {
 
 	_, err = store.SaveDeployment(ctx, deployment.CommitHash, deployment.ComposeContent, state.StatusRolledBack, "rollback")
 	if err != nil {
-		logger.Warn("failed to record rollback", "error", err)
+		logger.Warn("failed to record rollback", slog.Any("error", err))
 	}
 
 	fmt.Println("Rollback completed successfully")

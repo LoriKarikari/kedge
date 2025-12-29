@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -60,7 +61,7 @@ func (c *Client) removeNetworks(ctx context.Context) error {
 
 	var errs []error
 	for i := range networks {
-		c.logger.Info("removing network", "network", networks[i].Name)
+		c.logger.Info("removing network", slog.String("network", networks[i].Name))
 
 		removeCtx, removeCancel := context.WithTimeout(ctx, defaultTimeout)
 		if err := c.cli.NetworkRemove(removeCtx, networks[i].ID); err != nil {
@@ -103,7 +104,7 @@ func (c *Client) Prune(ctx context.Context, keepServices []string) error {
 		if lo.Contains(keepServices, serviceName) {
 			continue
 		}
-		c.logger.Info("pruning orphan container", "service", serviceName)
+		c.logger.Info("pruning orphan container", slog.String("service", serviceName))
 		if err := c.removeContainer(ctx, containers[i].ID); err != nil {
 			errs = append(errs, err)
 		}
