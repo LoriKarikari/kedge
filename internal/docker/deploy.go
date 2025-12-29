@@ -41,6 +41,11 @@ func (c *Client) Deploy(ctx context.Context, project *types.Project, commit stri
 }
 
 func (c *Client) ensureNetworks(ctx context.Context, project *types.Project) error {
+	defaultNetwork := fmt.Sprintf("%s_default", project.Name)
+	if err := c.ensureNetwork(ctx, defaultNetwork); err != nil {
+		return fmt.Errorf("ensure default network: %w", err)
+	}
+
 	for name := range project.Networks {
 		networkName := fmt.Sprintf("%s_%s", project.Name, name)
 		if err := c.ensureNetwork(ctx, networkName); err != nil {
@@ -196,7 +201,7 @@ func (c *Client) createAndStartContainer(ctx context.Context, projectName, servi
 
 	c.logger.Info("created container", "container", lo.Substring(resp.ID, 0, 12), "service", serviceName)
 
-	if err := c.connectToNetworks(ctx, resp.ID, svc, projectName); err != nil {
+	if err := c.connectToNetworks(ctx, resp.ID, serviceName, svc, projectName); err != nil {
 		return err
 	}
 
@@ -211,12 +216,21 @@ func (c *Client) createAndStartContainer(ctx context.Context, projectName, servi
 	return nil
 }
 
-func (c *Client) connectToNetworks(ctx context.Context, containerID string, svc types.ServiceConfig, projectName string) error {
-	for netName := range svc.Networks {
+func (c *Client) connectToNetworks(ctx context.Context, containerID, serviceName string, svc types.ServiceConfig, projectName string) error {
+	networks := lo.Keys(svc.Networks)
+	if len(networks) == 0 {
+		networks = []string{"default"}
+	}
+
+	for _, netName := range networks {
 		networkName := fmt.Sprintf("%s_%s", projectName, netName)
 
+		endpointConfig := &network.EndpointSettings{
+			Aliases: []string{serviceName},
+		}
+
 		connectCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
-		err := c.cli.NetworkConnect(connectCtx, networkName, containerID, nil)
+		err := c.cli.NetworkConnect(connectCtx, networkName, containerID, endpointConfig)
 		cancel()
 
 		if err != nil {
