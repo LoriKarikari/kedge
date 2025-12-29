@@ -1,3 +1,7 @@
-site_name: docs
+site_name: Kedge
+site_description: GitOps for Docker Compose
 theme:
   name: material
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
