@@ -35,53 +35,76 @@ var serveCmd = &cobra.Command{
 }
 
 func init() {
-	serveCmd.Flags().StringVar(&serveFlags.repoURL, "repo", "", "Git repository URL (required)")
-	serveCmd.Flags().StringVar(&serveFlags.branch, "branch", "main", "Git branch to watch")
-	serveCmd.Flags().StringVar(&serveFlags.workDir, "workdir", ".kedge/repo", "Working directory for git clone")
-	serveCmd.Flags().StringVar(&serveFlags.composePath, "compose", "docker-compose.yaml", "Path to compose file relative to repo root")
-	serveCmd.Flags().StringVar(&serveFlags.projectName, "project", "kedge", "Docker compose project name")
-	serveCmd.Flags().StringVar(&serveFlags.statePath, "state", ".kedge/state.db", "Path to state database")
-	serveCmd.Flags().DurationVar(&serveFlags.pollInterval, "poll", time.Minute, "Git poll interval")
-	serveCmd.Flags().StringVar(&serveFlags.mode, "mode", "auto", "Reconcile mode: auto, notify, manual")
-
-	if err := serveCmd.MarkFlagRequired("repo"); err != nil {
-		panic(err)
-	}
+	serveCmd.Flags().StringVar(&serveFlags.repoURL, "repo", "", "Git repository URL")
+	serveCmd.Flags().StringVar(&serveFlags.branch, "branch", "", "Git branch to watch")
+	serveCmd.Flags().StringVar(&serveFlags.workDir, "workdir", "", "Working directory for git clone")
+	serveCmd.Flags().StringVar(&serveFlags.composePath, "compose", "", "Path to compose file relative to repo root")
+	serveCmd.Flags().StringVar(&serveFlags.projectName, "project", "", "Docker compose project name")
+	serveCmd.Flags().StringVar(&serveFlags.statePath, "state", "", "Path to state database")
+	serveCmd.Flags().DurationVar(&serveFlags.pollInterval, "poll", 0, "Git poll interval")
+	serveCmd.Flags().StringVar(&serveFlags.mode, "mode", "", "Reconcile mode: auto, notify, manual")
 
 	rootCmd.AddCommand(serveCmd)
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
+	repoURL := coalesce(serveFlags.repoURL, cfg.Git.URL)
+	branch := coalesce(serveFlags.branch, cfg.Git.Branch)
+	workDir := coalesce(serveFlags.workDir, cfg.Git.WorkDir)
+	composePath := coalesce(serveFlags.composePath, cfg.Docker.ComposeFile)
+	projectName := coalesce(serveFlags.projectName, cfg.Docker.ProjectName)
+	statePath := coalesce(serveFlags.statePath, cfg.State.Path)
+	pollInterval := coalesceDuration(serveFlags.pollInterval, cfg.Git.PollInterval)
+	modeStr := coalesce(serveFlags.mode, cfg.Reconciliation.Mode)
+
+	if repoURL == "" {
+		return fmt.Errorf("repo URL required: use --repo flag or set git.url in kedge.yaml")
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	if err := os.MkdirAll(filepath.Dir(serveFlags.statePath), 0o750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(statePath), 0o750); err != nil {
 		return err
 	}
 
-	mode, err := reconcile.ParseMode(serveFlags.mode)
+	mode, err := reconcile.ParseMode(modeStr)
 	if err != nil {
-		return fmt.Errorf("invalid mode %q: must be one of auto, notify, manual", serveFlags.mode)
+		return fmt.Errorf("invalid mode %q: must be one of auto, notify, manual", modeStr)
 	}
 
-	watcher := git.NewWatcher(serveFlags.repoURL, serveFlags.branch, serveFlags.workDir, serveFlags.pollInterval)
+	watcher := git.NewWatcher(repoURL, branch, workDir, pollInterval)
 
-	cfg := controller.Config{
-		ProjectName:  serveFlags.projectName,
-		ComposePath:  serveFlags.composePath,
-		StatePath:    serveFlags.statePath,
+	ctrlCfg := controller.Config{
+		ProjectName:  projectName,
+		ComposePath:  composePath,
+		StatePath:    statePath,
 		ReconcileCfg: reconcile.Config{Mode: mode},
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	ctrl, err := controller.New(ctx, watcher, cfg, logger)
+	ctrl, err := controller.New(ctx, watcher, ctrlCfg, logger)
 	if err != nil {
 		return err
 	}
 	defer ctrl.Close()
 
-	slog.Info("starting kedge", "repo", serveFlags.repoURL, "branch", serveFlags.branch, "mode", serveFlags.mode)
+	slog.Info("starting kedge", "repo", repoURL, "branch", branch, "mode", modeStr)
 
 	return ctrl.Run(ctx)
+}
+
+func coalesce(flag, config string) string {
+	if flag != "" {
+		return flag
+	}
+	return config
+}
+
+func coalesceDuration(flag, config time.Duration) time.Duration {
+	if flag != 0 {
+		return flag
+	}
+	return config
 }
