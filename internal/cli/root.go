@@ -32,6 +32,7 @@ var rootCmd = &cobra.Command{
 			Level:  cfg.Logging.Level,
 			Format: cfg.Logging.Format,
 		})
+		slog.SetDefault(logger)
 		return nil
 	},
 }
