@@ -80,7 +80,7 @@ func runRollback(cmd *cobra.Command, args []string) error {
 
 	_, err = store.SaveDeployment(ctx, deployment.CommitHash, deployment.ComposeContent, state.StatusRolledBack, "rollback")
 	if err != nil {
-		logger.Warn("failed to record rollback", "error", err)
+		logger.Warn("failed to record rollback", slog.Any("error", err))
 	}
 
 	fmt.Println("Rollback completed successfully")

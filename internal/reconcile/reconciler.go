@@ -74,7 +74,7 @@ func New(client *docker.Client, project *types.Project, cfg Config, logger *slog
 		client:  client,
 		project: project,
 		config:  cfg,
-		logger:  logger.With("component", "reconciler"),
+		logger:  logger.With(slog.String("component", "reconciler")),
 	}
 }
 
@@ -112,7 +112,7 @@ func (r *Reconciler) Reconcile(ctx context.Context) *Result {
 		return &Result{Reconciled: false}
 	}
 
-	r.logger.Info("drift detected", "summary", diff.Summary)
+	r.logger.Info("drift detected", slog.String("summary", diff.Summary))
 
 	if r.config.Mode == ModeNotify {
 		r.logger.Info("notify mode: skipping remediation")
@@ -141,14 +141,14 @@ func (r *Reconciler) Sync(ctx context.Context) *Result {
 
 	serviceNames := docker.ServiceNames(project)
 	if err := r.client.Prune(ctx, serviceNames); err != nil {
-		r.logger.Warn("prune failed", "error", err)
+		r.logger.Warn("prune failed", slog.Any("error", err))
 	}
 
 	return &Result{Reconciled: true}
 }
 
 func (r *Reconciler) apply(ctx context.Context, changes []docker.ServiceDiff) *Result {
-	r.logger.Info("applying changes", "count", len(changes))
+	r.logger.Info("applying changes", slog.Int("count", len(changes)))
 
 	project, commit := r.getProjectAndCommit()
 
@@ -158,7 +158,7 @@ func (r *Reconciler) apply(ctx context.Context, changes []docker.ServiceDiff) *R
 
 	serviceNames := docker.ServiceNames(project)
 	if err := r.client.Prune(ctx, serviceNames); err != nil {
-		r.logger.Warn("prune failed", "error", err)
+		r.logger.Warn("prune failed", slog.Any("error", err))
 	}
 
 	r.logger.Info("reconciliation complete")

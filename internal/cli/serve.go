@@ -73,7 +73,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid mode %q: must be one of auto, notify, manual", modeStr)
 	}
 
-	watcher := git.NewWatcher(repoURL, branch, workDir, pollInterval)
+	watcher := git.NewWatcher(repoURL, branch, workDir, pollInterval, logger)
 
 	ctrlCfg := controller.Config{
 		ProjectName:  projectName,
@@ -99,12 +99,12 @@ func runServe(cmd *cobra.Command, args []string) error {
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			logger.Error("server shutdown error", "error", err)
+			logger.Error("server shutdown error", slog.Any("error", err))
 		}
 	}()
-	slog.Info("server started", "port", cfg.Server.Port)
+	logger.Info("server started", slog.Int("port", cfg.Server.Port))
 
-	slog.Info("starting kedge", "repo", repoURL, "branch", branch, "mode", modeStr)
+	logger.Info("starting kedge", slog.String("repo", repoURL), slog.String("branch", branch), slog.String("mode", modeStr))
 
 	return ctrl.Run(ctx)
 }

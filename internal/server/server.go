@@ -102,7 +102,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	go func() {
 		if err := s.server.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			s.logger.Error("server error", "error", err)
+			s.logger.Error("server error", slog.Any("error", err))
 		}
 	}()
 	return nil

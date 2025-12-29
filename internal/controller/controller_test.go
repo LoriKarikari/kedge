@@ -23,6 +23,7 @@ func TestNew(t *testing.T) {
 		"master",
 		filepath.Join(tmpDir, "repo"),
 		time.Minute,
+		nil,
 	)
 
 	cfg := Config{
