@@ -3,8 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"os"
 	"path/filepath"
 
 	"github.com/LoriKarikari/kedge/internal/docker"
@@ -37,7 +35,6 @@ func init() {
 
 func runStatus(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	client, err := docker.NewClient(statusFlags.projectName, logger)
 	if err != nil {

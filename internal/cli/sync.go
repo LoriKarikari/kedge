@@ -3,8 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"os"
 
 	"github.com/LoriKarikari/kedge/internal/controller"
 	"github.com/LoriKarikari/kedge/internal/reconcile"
@@ -38,7 +36,6 @@ func init() {
 
 func runSync(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	cfg := controller.Config{
 		ProjectName:  syncFlags.projectName,

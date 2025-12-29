@@ -36,7 +36,6 @@ func init() {
 
 func runRollback(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	commitPrefix := args[0]
 
 	store, err := state.New(ctx, rollbackFlags.statePath)

@@ -62,8 +62,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("repo URL required: use --repo flag or set git.url in kedge.yaml")
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
 	if err := os.MkdirAll(filepath.Dir(statePath), 0o750); err != nil {
 		return err
 	}
