@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.0](https://github.com/LoriKarikari/kedge/compare/v0.1.0...v0.2.0) (2025-12-29)
+
+
+### Features
+
+* **config:** add YAML configuration file support ([#31](https://github.com/LoriKarikari/kedge/issues/31)) ([9bf170c](https://github.com/LoriKarikari/kedge/commit/9bf170c35591d642c6851e5f7e16817a142ed9b4))
+* **server:** add health and ready endpoints ([#32](https://github.com/LoriKarikari/kedge/issues/32)) ([7e919c0](https://github.com/LoriKarikari/kedge/commit/7e919c098662b919649a2cb871530866fd449577))
+
+
+### Bug Fixes
+
+* **docker:** connect containers to default network with DNS aliases ([bd6e44d](https://github.com/LoriKarikari/kedge/commit/bd6e44dedcbde759a2a3a0ae86b4dbd3c421c6d1))
+* **docker:** connect containers to default network with DNS aliases ([7680af9](https://github.com/LoriKarikari/kedge/commit/7680af9bacd2ac8baa84b82e5a4a5a7ab6768cd3))
+
 ## 0.1.0 (2025-12-29)
 
 
