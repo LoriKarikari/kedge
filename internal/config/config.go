@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"time"
 
@@ -79,7 +80,17 @@ func Default() *Config {
 func Load(path string) (*Config, error) {
 	cfg := Default()
 
-	data, err := os.ReadFile(path)
+	dir := filepath.Dir(path)
+	if dir == "" {
+		dir = "."
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, fmt.Errorf("open config dir: %w", err)
+	}
+	defer root.Close()
+
+	data, err := root.ReadFile(filepath.Base(path))
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
