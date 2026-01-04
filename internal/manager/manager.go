@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"sync"
+
+	"github.com/samber/lo"
 
 	"github.com/LoriKarikari/kedge/internal/config"
 	"github.com/LoriKarikari/kedge/internal/controller"
@@ -19,9 +22,15 @@ type Config struct {
 	PollInterval string
 }
 
+type RepoStatus struct {
+	Running bool
+	Error   error
+}
+
 type Manager struct {
 	store       *state.Store
 	controllers map[string]*controller.Controller
+	repoStatus  map[string]*RepoStatus
 	logger      *slog.Logger
 	mu          sync.RWMutex
 }
@@ -30,6 +39,7 @@ func New(store *state.Store, logger *slog.Logger) *Manager {
 	return &Manager{
 		store:       store,
 		controllers: make(map[string]*controller.Controller),
+		repoStatus:  make(map[string]*RepoStatus),
 		logger:      logger.With(slog.String("component", "manager")),
 	}
 }
@@ -63,14 +73,24 @@ func (m *Manager) Start(ctx context.Context, cfg Config) error {
 	wg.Wait()
 	close(errCh)
 
-	var errs []error
+	var failedRepos []string
 	for err := range errCh {
-		errs = append(errs, err)
-	}
-	if len(errs) > 0 {
-		return errs[0]
+		failedRepos = append(failedRepos, err.Error())
 	}
 
+	m.mu.RLock()
+	runningCount := len(m.controllers)
+	m.mu.RUnlock()
+
+	if runningCount == 0 && len(failedRepos) > 0 {
+		return fmt.Errorf("all repos failed to start: %s", strings.Join(failedRepos, "; "))
+	}
+
+	if len(failedRepos) > 0 {
+		m.logger.Warn("some repos failed to start", slog.Int("failed", len(failedRepos)), slog.Int("running", runningCount))
+	}
+
+	<-ctx.Done()
 	return nil
 }
 
@@ -79,11 +99,17 @@ func (m *Manager) startRepo(ctx context.Context, repo *state.Repo, mgrCfg Config
 	watcher := git.NewWatcher(repo.URL, repo.Branch, workDir, config.Default().Git.PollInterval, m.logger)
 
 	if err := watcher.Clone(ctx); err != nil {
+		m.mu.Lock()
+		m.repoStatus[repo.Name] = &RepoStatus{Running: false, Error: fmt.Errorf("clone: %w", err)}
+		m.mu.Unlock()
 		return fmt.Errorf("clone: %w", err)
 	}
 
 	repoCfg, err := loadRepoConfig(repo.Name)
 	if err != nil {
+		m.mu.Lock()
+		m.repoStatus[repo.Name] = &RepoStatus{Running: false, Error: fmt.Errorf("kedge.yaml not found")}
+		m.mu.Unlock()
 		return fmt.Errorf("kedge.yaml not found")
 	}
 
@@ -102,32 +128,49 @@ func (m *Manager) startRepo(ctx context.Context, repo *state.Repo, mgrCfg Config
 
 	ctrl, err := controller.New(ctx, watcher, ctrlCfg, m.logger)
 	if err != nil {
+		m.mu.Lock()
+		m.repoStatus[repo.Name] = &RepoStatus{Running: false, Error: fmt.Errorf("create controller: %w", err)}
+		m.mu.Unlock()
 		return fmt.Errorf("create controller: %w", err)
 	}
 
 	m.mu.Lock()
 	m.controllers[repo.Name] = ctrl
+	m.repoStatus[repo.Name] = &RepoStatus{Running: true}
 	m.mu.Unlock()
 
 	m.logger.Info("starting repo", slog.String("repo", repo.Name), slog.String("url", repo.URL))
 
-	return ctrl.Run(ctx)
+	go func() {
+		if err := ctrl.Run(ctx); err != nil && ctx.Err() == nil {
+			m.mu.Lock()
+			m.repoStatus[repo.Name] = &RepoStatus{Running: false, Error: err}
+			m.mu.Unlock()
+			m.logger.Error("controller stopped", slog.String("repo", repo.Name), slog.Any("error", err))
+		}
+	}()
+
+	return nil
 }
 
 func (m *Manager) IsReady() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if len(m.controllers) == 0 {
-		return false
-	}
+	return lo.SomeBy(lo.Values(m.controllers), func(ctrl *controller.Controller) bool {
+		return ctrl.IsReady()
+	})
+}
 
-	for _, ctrl := range m.controllers {
-		if !ctrl.IsReady() {
-			return false
-		}
+func (m *Manager) Status() map[string]*RepoStatus {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	result := make(map[string]*RepoStatus, len(m.repoStatus))
+	for k, v := range m.repoStatus {
+		result[k] = &RepoStatus{Running: v.Running, Error: v.Error}
 	}
-	return true
+	return result
 }
 
 func (m *Manager) Close() error {

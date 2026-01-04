@@ -4,11 +4,14 @@ import (
 	"context"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/LoriKarikari/kedge/internal/state"
 )
+
+const testRepoName = "test-repo"
 
 func newTestStore(t *testing.T) *state.Store {
 	t.Helper()
@@ -30,6 +33,9 @@ func TestNew(t *testing.T) {
 	}
 	if mgr.controllers == nil {
 		t.Error("expected controllers map to be initialized")
+	}
+	if mgr.repoStatus == nil {
+		t.Error("expected repoStatus map to be initialized")
 	}
 }
 
@@ -55,10 +61,10 @@ func TestStartNoRepos(t *testing.T) {
 	}
 }
 
-func TestStartMissingKedgeYaml(t *testing.T) {
+func TestStartAllReposFail(t *testing.T) {
 	store := newTestStore(t)
 
-	_, err := store.SaveRepo(t.Context(), "test-repo", "https://github.com/octocat/Hello-World.git", "master")
+	_, err := store.SaveRepo(t.Context(), testRepoName, "https://github.com/octocat/Hello-World.git", "master")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,10 +76,72 @@ func TestStartMissingKedgeYaml(t *testing.T) {
 	})
 
 	if err == nil {
-		t.Fatal("expected error for missing kedge.yaml")
+		t.Fatal("expected error when all repos fail")
 	}
-	if err.Error() != "repo test-repo: kedge.yaml not found" {
-		t.Errorf("unexpected error: %v", err)
+	if !strings.Contains(err.Error(), "all repos failed to start") {
+		t.Errorf("expected 'all repos failed' error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "kedge.yaml not found") {
+		t.Errorf("expected error to mention kedge.yaml, got: %v", err)
+	}
+
+	status := mgr.Status()
+	if len(status) != 1 {
+		t.Errorf("expected 1 status entry, got %d", len(status))
+	}
+	if status[testRepoName] == nil {
+		t.Error("expected status for " + testRepoName)
+	} else if status[testRepoName].Running {
+		t.Error("expected " + testRepoName + " to not be running")
+	}
+}
+
+func TestStartMultipleReposFail(t *testing.T) {
+	store := newTestStore(t)
+
+	_, err := store.SaveRepo(t.Context(), "repo1", "https://github.com/octocat/Hello-World.git", "master")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = store.SaveRepo(t.Context(), "repo2", "https://github.com/octocat/Spoon-Knife.git", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mgr := New(store, slog.Default())
+
+	err = mgr.Start(t.Context(), Config{
+		StatePath: filepath.Join(t.TempDir(), "state.db"),
+	})
+
+	if err == nil {
+		t.Fatal("expected error when all repos fail")
+	}
+	if !strings.Contains(err.Error(), "all repos failed to start") {
+		t.Errorf("expected 'all repos failed' error, got: %v", err)
+	}
+
+	status := mgr.Status()
+	if len(status) != 2 {
+		t.Errorf("expected 2 status entries, got %d", len(status))
+	}
+	for name, s := range status {
+		if s.Running {
+			t.Errorf("expected %s to not be running", name)
+		}
+		if s.Error == nil {
+			t.Errorf("expected %s to have an error", name)
+		}
+	}
+}
+
+func TestStatusEmpty(t *testing.T) {
+	store := newTestStore(t)
+	mgr := New(store, slog.Default())
+
+	status := mgr.Status()
+	if len(status) != 0 {
+		t.Errorf("expected empty status, got %d entries", len(status))
 	}
 }
 
