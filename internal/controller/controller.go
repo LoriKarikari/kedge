@@ -15,6 +15,7 @@ import (
 )
 
 type Config struct {
+	RepoName     string
 	ProjectName  string
 	ComposePath  string
 	WorkDir      string
@@ -159,7 +160,7 @@ func (c *Controller) loadAndReconcile(ctx context.Context, commit string) error 
 		return fmt.Errorf("read compose file: %w", err)
 	}
 
-	deployment, err := c.store.SaveDeployment(ctx, commit, string(composeContent), state.StatusPending, "")
+	deployment, err := c.store.SaveDeployment(ctx, c.config.RepoName, commit, string(composeContent), state.StatusPending, "")
 	if err != nil {
 		c.logger.Warn("failed to save deployment", slog.Any("error", err))
 	}

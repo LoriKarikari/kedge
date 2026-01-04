@@ -14,11 +14,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var rollbackFlags struct {
-	projectName string
-	statePath   string
-}
-
 var rollbackCmd = &cobra.Command{
 	Use:   "rollback <commit>",
 	Short: "Rollback to a previous deployment",
@@ -28,23 +23,24 @@ var rollbackCmd = &cobra.Command{
 }
 
 func init() {
-	rollbackCmd.Flags().StringVar(&rollbackFlags.projectName, "project", "kedge", "Docker compose project name")
-	rollbackCmd.Flags().StringVar(&rollbackFlags.statePath, "state", ".kedge/state.db", "Path to state database")
-
 	rootCmd.AddCommand(rollbackCmd)
 }
 
 func runRollback(cmd *cobra.Command, args []string) error {
+	if repo == nil {
+		return fmt.Errorf("--repo is required")
+	}
+
 	ctx := context.Background()
 	commitPrefix := args[0]
 
-	store, err := state.New(ctx, rollbackFlags.statePath)
+	store, err := state.New(ctx, cfg.State.Path)
 	if err != nil {
 		return err
 	}
 	defer store.Close()
 
-	deployment, err := findDeployment(ctx, store, commitPrefix)
+	deployment, err := findDeployment(ctx, store, repo.Name, commitPrefix)
 	if err != nil {
 		return err
 	}
@@ -60,12 +56,12 @@ func runRollback(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("write compose file: %w", err)
 	}
 
-	project, err := docker.LoadProject(ctx, composePath, rollbackFlags.projectName)
+	project, err := docker.LoadProject(ctx, composePath, cfg.Docker.ProjectName)
 	if err != nil {
 		return fmt.Errorf("load compose: %w", err)
 	}
 
-	client, err := docker.NewClient(rollbackFlags.projectName, logger)
+	client, err := docker.NewClient(cfg.Docker.ProjectName, logger)
 	if err != nil {
 		return err
 	}
@@ -77,7 +73,7 @@ func runRollback(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("deploy: %w", err)
 	}
 
-	_, err = store.SaveDeployment(ctx, deployment.CommitHash, deployment.ComposeContent, state.StatusRolledBack, "rollback")
+	_, err = store.SaveDeployment(ctx, repo.Name, deployment.CommitHash, deployment.ComposeContent, state.StatusRolledBack, "rollback")
 	if err != nil {
 		logger.Warn("failed to record rollback", slog.Any("error", err))
 	}
@@ -86,8 +82,8 @@ func runRollback(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func findDeployment(ctx context.Context, store *state.Store, prefix string) (*state.Deployment, error) {
-	deployment, err := store.GetDeploymentByCommit(ctx, prefix)
+func findDeployment(ctx context.Context, store *state.Store, repoName, prefix string) (*state.Deployment, error) {
+	deployment, err := store.GetDeploymentByCommit(ctx, repoName, prefix)
 	if err == nil {
 		return deployment, nil
 	}
@@ -95,7 +91,7 @@ func findDeployment(ctx context.Context, store *state.Store, prefix string) (*st
 		return nil, err
 	}
 
-	deployments, err := store.ListDeployments(ctx, 100)
+	deployments, err := store.ListDeployments(ctx, repoName, 100)
 	if err != nil {
 		return nil, err
 	}

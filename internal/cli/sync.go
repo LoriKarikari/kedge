@@ -10,11 +10,7 @@ import (
 )
 
 var syncFlags struct {
-	projectName string
-	composePath string
-	workdir     string
-	statePath   string
-	force       bool
+	force bool
 }
 
 var syncCmd = &cobra.Command{
@@ -25,27 +21,27 @@ var syncCmd = &cobra.Command{
 }
 
 func init() {
-	syncCmd.Flags().StringVar(&syncFlags.projectName, "project", "kedge", "Docker compose project name")
-	syncCmd.Flags().StringVar(&syncFlags.composePath, "compose", "docker-compose.yaml", "Path to compose file relative to workdir")
-	syncCmd.Flags().StringVar(&syncFlags.workdir, "workdir", ".kedge/repo", "Working directory containing the compose file")
-	syncCmd.Flags().StringVar(&syncFlags.statePath, "state", ".kedge/state.db", "Path to state database")
 	syncCmd.Flags().BoolVar(&syncFlags.force, "force", false, "Force sync even if no drift detected")
-
 	rootCmd.AddCommand(syncCmd)
 }
 
 func runSync(cmd *cobra.Command, args []string) error {
+	if repo == nil {
+		return fmt.Errorf("--repo is required")
+	}
+
 	ctx := context.Background()
 
-	cfg := controller.Config{
-		ProjectName:  syncFlags.projectName,
-		ComposePath:  syncFlags.composePath,
-		WorkDir:      syncFlags.workdir,
-		StatePath:    syncFlags.statePath,
+	ctrlCfg := controller.Config{
+		RepoName:     repo.Name,
+		ProjectName:  cfg.Docker.ProjectName,
+		ComposePath:  cfg.Docker.ComposeFile,
+		WorkDir:      repoWorkDir(repo.Name),
+		StatePath:    cfg.State.Path,
 		ReconcileCfg: reconcile.Config{Mode: reconcile.ModeAuto},
 	}
 
-	ctrl, err := controller.NewStandalone(ctx, cfg, logger)
+	ctrl, err := controller.NewStandalone(ctx, ctrlCfg, logger)
 	if err != nil {
 		return err
 	}

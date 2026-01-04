@@ -10,13 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var statusFlags struct {
-	projectName string
-	composePath string
-	statePath   string
-	workdir     string
-}
-
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show current deployment status",
@@ -25,25 +18,24 @@ var statusCmd = &cobra.Command{
 }
 
 func init() {
-	statusCmd.Flags().StringVar(&statusFlags.projectName, "project", "kedge", "Docker compose project name")
-	statusCmd.Flags().StringVar(&statusFlags.composePath, "compose", "docker-compose.yaml", "Path to compose file relative to workdir")
-	statusCmd.Flags().StringVar(&statusFlags.statePath, "state", ".kedge/state.db", "Path to state database")
-	statusCmd.Flags().StringVar(&statusFlags.workdir, "workdir", ".kedge/repo", "Working directory containing the compose file")
-
 	rootCmd.AddCommand(statusCmd)
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
+	if repo == nil {
+		return fmt.Errorf("--repo is required")
+	}
+
 	ctx := context.Background()
 
-	client, err := docker.NewClient(statusFlags.projectName, logger)
+	client, err := docker.NewClient(cfg.Docker.ProjectName, logger)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 
-	composePath := filepath.Join(statusFlags.workdir, statusFlags.composePath)
-	project, err := docker.LoadProject(ctx, composePath, statusFlags.projectName)
+	composePath := filepath.Join(repoWorkDir(repo.Name), cfg.Docker.ComposeFile)
+	project, err := docker.LoadProject(ctx, composePath, cfg.Docker.ProjectName)
 	if err != nil {
 		return fmt.Errorf("load compose: %w", err)
 	}
@@ -64,12 +56,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("\n=== Last Deployment ===")
-	store, err := state.New(ctx, statusFlags.statePath)
+	store, err := state.New(ctx, cfg.State.Path)
 	if err != nil {
 		return err
 	}
 	defer store.Close()
-	deployment, err := store.GetLastDeployment(ctx)
+	deployment, err := store.GetLastDeployment(ctx, repo.Name)
 	switch {
 	case err == state.ErrNotFound:
 		fmt.Println("No deployments yet")

@@ -29,7 +29,12 @@ func runHealthcheck(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d/health", healthcheckFlags.port), nil)
+	port := cfg.Server.Port
+	if cmd.Flags().Changed("port") {
+		port = healthcheckFlags.port
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d/health", port), nil)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}

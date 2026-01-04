@@ -10,8 +10,7 @@ import (
 )
 
 var historyFlags struct {
-	statePath string
-	limit     int
+	limit int
 }
 
 var historyCmd = &cobra.Command{
@@ -22,22 +21,24 @@ var historyCmd = &cobra.Command{
 }
 
 func init() {
-	historyCmd.Flags().StringVar(&historyFlags.statePath, "state", ".kedge/state.db", "Path to state database")
 	historyCmd.Flags().IntVar(&historyFlags.limit, "limit", 10, "Maximum number of entries to show")
-
 	rootCmd.AddCommand(historyCmd)
 }
 
 func runHistory(cmd *cobra.Command, args []string) error {
+	if repo == nil {
+		return fmt.Errorf("--repo is required")
+	}
+
 	ctx := context.Background()
 
-	store, err := state.New(ctx, historyFlags.statePath)
+	store, err := state.New(ctx, cfg.State.Path)
 	if err != nil {
 		return err
 	}
 	defer store.Close()
 
-	deployments, err := store.ListDeployments(ctx, historyFlags.limit)
+	deployments, err := store.ListDeployments(ctx, repo.Name, historyFlags.limit)
 	if err != nil {
 		return err
 	}

@@ -1,167 +1,114 @@
-# kedge
+<p align="center">
+  <h1 align="center">kedge</h1>
+  <h2 align="center">GitOps controller for Docker Compose</h2>
+</p>
 
-Kedge is a GitOps controller for Docker Compose. It watches a Git repository and automatically deploys changes, detects drift between desired and actual state, and provides rollback capabilities.
+<p align="center">
+  <a href="https://lorikarikari.github.io/kedge/"><img src="https://img.shields.io/badge/Documentation-394e79?logo=readthedocs&logoColor=00B9FF" alt="Documentation"></a>
+  <a href="https://github.com/LoriKarikari/kedge/releases"><img src="https://img.shields.io/github/v/release/LoriKarikari/kedge" alt="Release"></a>
+  <a href="https://github.com/LoriKarikari/kedge/blob/main/LICENSE"><img src="https://img.shields.io/github/license/LoriKarikari/kedge" alt="License"></a>
+  <a href="https://github.com/LoriKarikari/kedge/actions"><img src="https://github.com/LoriKarikari/kedge/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://goreportcard.com/report/github.com/LoriKarikari/kedge"><img src="https://goreportcard.com/badge/github.com/LoriKarikari/kedge" alt="Go Report Card"></a>
+</p>
 
-## 1. Features
+Kedge watches Git repositories and automatically deploys Docker Compose applications. It detects drift between desired and actual state, provides rollback capabilities, and supports multiple reconciliation modes.
 
-- **Git Integration**: Polls a Git repository for changes and deploys automatically
-- **Drift Detection**: Compares running containers against the compose file and reconciles differences
-- **Multiple Reconciliation Modes**: Auto, notify, or manual control over deployments
-- **Deployment History**: Tracks all deployments with commit hashes and status
-- **Rollback Support**: Restore previous deployments by commit reference
-- **Health Endpoints**: Liveness and readiness probes for container health checks
-- **YAML Configuration**: Optional configuration file with environment variable expansion
+### Features
 
-## 2. Installation
+- **Multi-Repo Support**: Register and manage multiple repositories
+- **Git Integration**: Polls repositories for changes and deploys automatically
+- **Drift Detection**: Compares running containers against compose files
+- **Reconciliation Modes**: Auto, notify, or manual control
+- **Deployment History**: Tracks deployments with commit hashes and status
+- **Rollback**: Restore previous deployments by commit reference
 
-### From Source
+## Quick Start
+
+```bash
+# Add a repository
+kedge repo add https://github.com/user/app.git
+
+# Start watching
+kedge serve --repo app
+
+# Check status
+kedge status --repo app
+```
+
+Each repository should contain a `kedge.yaml`:
+
+```yaml
+docker:
+  project_name: myapp
+  compose_file: docker-compose.yaml
+```
+
+## Installation
 
 ```bash
 go install github.com/LoriKarikari/kedge/cmd/kedge@latest
 ```
 
-### Build from Repository
+Or build from source:
 
 ```bash
 git clone https://github.com/LoriKarikari/kedge.git
-cd kedge
-make build
+cd kedge && make build
 ```
 
-## 3. Quick Start
+## Commands
+
+### Repository Management
 
 ```bash
-# Start watching a repository
-kedge serve --repo https://github.com/user/app.git --project myapp
-
-# Check current status
-kedge status
-
-# View deployment history
-kedge history
-
-# Force sync
-kedge sync --force
+kedge repo add <url> [--name NAME] [--branch BRANCH]
+kedge repo list
+kedge repo remove <name>
 ```
 
-## 4. Configuration
+### Operations
 
-### 4.1 Configuration File
+All operational commands require `--repo <name>`:
 
-Create a `kedge.yaml` in your working directory:
+```bash
+kedge serve --repo <name>        # Start GitOps controller
+kedge sync --repo <name>         # Trigger reconciliation
+kedge diff --repo <name>         # Show drift
+kedge status --repo <name>       # Show deployment status
+kedge history --repo <name>      # List deployments
+kedge rollback --repo <name> <commit>
+```
+
+### Health Check
+
+```bash
+kedge healthcheck [--port N]
+```
+
+## Configuration
+
+Repository `kedge.yaml`:
 
 ```yaml
-git:
-  url: https://github.com/user/app.git
-  branch: main
-  poll_interval: 1m
-  work_dir: .kedge/repo
-
 docker:
   project_name: myapp
   compose_file: docker-compose.yaml
 
 reconciliation:
-  mode: auto
-  interval: 1m
-
-state:
-  path: .kedge/state.db
+  mode: auto       
 
 logging:
   level: info
   format: text
-
-server:
-  port: 8080
 ```
 
-### 4.2 Environment Variables
-
-Configuration values support environment variable expansion:
+Environment variable expansion is supported:
 
 ```yaml
-git:
-  url: ${KEDGE_REPO}
-  branch: ${KEDGE_BRANCH:-main}
+docker:
+  project_name: ${APP_NAME:-myapp}
 ```
 
-## 5. CLI Commands
+## AI Assistance Disclaimer
 
-### 5.1 serve
-
-Start the GitOps controller.
-
-```bash
-kedge serve --repo <url> [flags]
-```
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--repo` | Git repository URL | required |
-| `--branch` | Git branch to watch | main |
-| `--project` | Docker compose project name | kedge |
-| `--compose` | Path to compose file | docker-compose.yaml |
-| `--mode` | Reconciliation mode | auto |
-| `--poll` | Git poll interval | 1m |
-
-### 5.2 sync
-
-Trigger immediate reconciliation.
-
-```bash
-kedge sync [flags]
-```
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--force` | Force sync even if no drift | false |
-| `--project` | Docker compose project name | kedge |
-
-### 5.3 diff
-
-Show drift between desired and actual state.
-
-```bash
-kedge diff [flags]
-```
-
-### 5.4 status
-
-Display current deployment status.
-
-```bash
-kedge status [flags]
-```
-
-### 5.5 history
-
-List deployment history.
-
-```bash
-kedge history [flags]
-```
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--limit` | Number of entries to show | 10 |
-
-### 5.6 rollback
-
-Rollback to a previous deployment.
-
-```bash
-kedge rollback <commit> [flags]
-```
-
-## 6. Reconciliation Modes
-
-| Mode | Behavior |
-|------|----------|
-| `auto` | Automatically apply changes when drift is detected |
-| `notify` | Detect drift but do not apply changes |
-| `manual` | Only reconcile when explicitly triggered via `kedge sync` |
-
-## 7. AI Assistance Disclaimer
-
-AI tools (Claude) were used during development.
+AI tools (such as Claude, CodeRabbit, Greptile) were used during development, but all code is reviewed and tested by the maintainers to ensure quality and correctness.
