@@ -5,7 +5,7 @@
 
 <p align="center">
   <a href="https://lorikarikari.github.io/kedge/"><img src="https://img.shields.io/badge/Documentation-394e79?logo=readthedocs&logoColor=00B9FF" alt="Documentation"></a>
-  <a href="https://github.com/LoriKarikari/kedge/releases"><img src="https://img.shields.io/github/v/release/LoriKarikari/kedge" alt="Release"></a>
+<a href="https://github.com/LoriKarikari/kedge/releases"><img src="https://img.shields.io/github/v/release/LoriKarikari/kedge" alt="Release"></a>
   <a href="https://github.com/LoriKarikari/kedge/blob/main/LICENSE"><img src="https://img.shields.io/github/license/LoriKarikari/kedge" alt="License"></a>
   <a href="https://github.com/LoriKarikari/kedge/actions"><img src="https://github.com/LoriKarikari/kedge/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://goreportcard.com/report/github.com/LoriKarikari/kedge"><img src="https://goreportcard.com/badge/github.com/LoriKarikari/kedge" alt="Go Report Card"></a>
@@ -28,8 +28,8 @@ Kedge watches Git repositories and automatically deploys Docker Compose applicat
 # Add a repository
 kedge repo add https://github.com/user/app.git
 
-# Start watching
-kedge serve --repo app
+# Start watching all repos
+kedge serve
 
 # Check status
 kedge status --repo app
@@ -68,10 +68,8 @@ kedge repo remove <name>
 
 ### Operations
 
-All operational commands require `--repo <name>`:
-
 ```bash
-kedge serve --repo <name>        # Start GitOps controller
+kedge serve                      # Start controller (watches all repos)
 kedge sync --repo <name>         # Trigger reconciliation
 kedge diff --repo <name>         # Show drift
 kedge status --repo <name>       # Show deployment status
