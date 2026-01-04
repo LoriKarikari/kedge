@@ -80,12 +80,17 @@ func Default() *Config {
 func Load(path string) (*Config, error) {
 	cfg := Default()
 
-	cleanPath := filepath.Clean(path)
-	if filepath.IsAbs(cleanPath) || cleanPath != filepath.Base(cleanPath) {
-		return nil, fmt.Errorf("config path must be a filename in current directory")
+	dir := filepath.Dir(path)
+	if dir == "" {
+		dir = "."
 	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, fmt.Errorf("open config dir: %w", err)
+	}
+	defer root.Close()
 
-	data, err := os.ReadFile(cleanPath)
+	data, err := root.ReadFile(filepath.Base(path))
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}

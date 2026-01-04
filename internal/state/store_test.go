@@ -8,6 +8,7 @@ import (
 const (
 	testCommitFmt     = "commit: got %q, want %q"
 	testDeploymentMsg = "deployment failed"
+	testRepoName      = "test-repo"
 )
 
 func newTestStore(t *testing.T) *Store {
@@ -18,6 +19,10 @@ func newTestStore(t *testing.T) *Store {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
+	_, err = store.SaveRepo(t.Context(), testRepoName, "https://example.com/repo.git", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
 	return store
 }
 
@@ -32,7 +37,7 @@ func TestSaveDeployment(t *testing.T) {
 	store := newTestStore(t)
 	ctx := t.Context()
 
-	d, err := store.SaveDeployment(ctx, "abc123", "services:\n  web:\n    image: nginx", StatusSuccess, "deployed successfully")
+	d, err := store.SaveDeployment(ctx, testRepoName, "abc123", "services:\n  web:\n    image: nginx", StatusSuccess, "deployed successfully")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,17 +57,17 @@ func TestGetLastDeployment(t *testing.T) {
 	store := newTestStore(t)
 	ctx := t.Context()
 
-	_, err := store.SaveDeployment(ctx, "commit1", "content1", StatusSuccess, "")
+	_, err := store.SaveDeployment(ctx, testRepoName, "commit1", "content1", StatusSuccess, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = store.SaveDeployment(ctx, "commit2", "content2", StatusSuccess, "")
+	_, err = store.SaveDeployment(ctx, testRepoName, "commit2", "content2", StatusSuccess, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	last, err := store.GetLastDeployment(ctx)
+	last, err := store.GetLastDeployment(ctx, testRepoName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +80,7 @@ func TestGetLastDeployment(t *testing.T) {
 func TestGetLastDeploymentEmpty(t *testing.T) {
 	store := newTestStore(t)
 
-	_, err := store.GetLastDeployment(t.Context())
+	_, err := store.GetLastDeployment(t.Context(), testRepoName)
 	if err != ErrNotFound {
 		t.Errorf("error: got %v, want ErrNotFound", err)
 	}
@@ -85,12 +90,12 @@ func TestGetDeploymentByCommit(t *testing.T) {
 	store := newTestStore(t)
 	ctx := t.Context()
 
-	_, err := store.SaveDeployment(ctx, "abc123", "content", StatusSuccess, "")
+	_, err := store.SaveDeployment(ctx, testRepoName, "abc123", "content", StatusSuccess, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	d, err := store.GetDeploymentByCommit(ctx, "abc123")
+	d, err := store.GetDeploymentByCommit(ctx, testRepoName, "abc123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +108,7 @@ func TestGetDeploymentByCommit(t *testing.T) {
 func TestGetDeploymentByCommitNotFound(t *testing.T) {
 	store := newTestStore(t)
 
-	_, err := store.GetDeploymentByCommit(t.Context(), "nonexistent")
+	_, err := store.GetDeploymentByCommit(t.Context(), testRepoName, "nonexistent")
 	if err != ErrNotFound {
 		t.Errorf("error: got %v, want ErrNotFound", err)
 	}
@@ -114,13 +119,13 @@ func TestListDeployments(t *testing.T) {
 	ctx := t.Context()
 
 	for i := range 5 {
-		_, err := store.SaveDeployment(ctx, "commit"+string(rune('0'+i)), "content", StatusSuccess, "")
+		_, err := store.SaveDeployment(ctx, testRepoName, "commit"+string(rune('0'+i)), "content", StatusSuccess, "")
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	deployments, err := store.ListDeployments(ctx, 3)
+	deployments, err := store.ListDeployments(ctx, testRepoName, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +143,7 @@ func TestUpdateDeploymentStatus(t *testing.T) {
 	store := newTestStore(t)
 	ctx := t.Context()
 
-	d, err := store.SaveDeployment(ctx, "abc123", "content", StatusPending, "")
+	d, err := store.SaveDeployment(ctx, testRepoName, "abc123", "content", StatusPending, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +179,7 @@ func TestStatusRolledBack(t *testing.T) {
 	store := newTestStore(t)
 	ctx := t.Context()
 
-	d, err := store.SaveDeployment(ctx, "abc123", "content", StatusSuccess, "")
+	d, err := store.SaveDeployment(ctx, testRepoName, "abc123", "content", StatusSuccess, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +202,7 @@ func TestStatusRolledBack(t *testing.T) {
 func TestSaveDeploymentInvalidStatus(t *testing.T) {
 	store := newTestStore(t)
 
-	_, err := store.SaveDeployment(t.Context(), "abc123", "content", "invalid", "")
+	_, err := store.SaveDeployment(t.Context(), testRepoName, "abc123", "content", "invalid", "")
 	if err != ErrInvalidStatus {
 		t.Errorf("error: got %v, want ErrInvalidStatus", err)
 	}
@@ -207,7 +212,7 @@ func TestUpdateDeploymentStatusInvalid(t *testing.T) {
 	store := newTestStore(t)
 	ctx := t.Context()
 
-	d, err := store.SaveDeployment(ctx, "abc123", "content", StatusPending, "")
+	d, err := store.SaveDeployment(ctx, testRepoName, "abc123", "content", StatusPending, "")
 	if err != nil {
 		t.Fatal(err)
 	}

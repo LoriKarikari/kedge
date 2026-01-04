@@ -7,10 +7,41 @@ import (
 	"time"
 
 	z "github.com/Oudwins/zog"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/sqlite"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	_ "modernc.org/sqlite" // sqlite driver
+
+	"github.com/LoriKarikari/kedge/internal/state/migrations"
 )
 
-var ErrNotFound = errors.New("not found")
+var (
+	ErrNotFound      = errors.New("not found")
+	ErrInvalidStatus = errors.New("invalid deployment status")
+)
+
+const DefaultListLimit = 100
+
+type Store struct {
+	db *sql.DB
+}
+
+type Repo struct {
+	Name      string
+	URL       string
+	Branch    string
+	CreatedAt time.Time
+}
+
+type Deployment struct {
+	ID             int64
+	RepoName       string
+	CommitHash     string
+	ComposeContent string
+	DeployedAt     time.Time
+	Status         DeploymentStatus
+	Message        string
+}
 
 type DeploymentStatus string
 
@@ -20,8 +51,6 @@ const (
 	StatusFailed     DeploymentStatus = "failed"
 	StatusSkipped    DeploymentStatus = "skipped"
 	StatusRolledBack DeploymentStatus = "rolled_back"
-
-	DefaultListLimit = 100
 )
 
 var statusSchema = z.String().OneOf([]string{
@@ -32,39 +61,10 @@ var statusSchema = z.String().OneOf([]string{
 	string(StatusRolledBack),
 })
 
-var ErrInvalidStatus = errors.New("invalid deployment status")
-
 func (s DeploymentStatus) IsValid() bool {
 	str := string(s)
 	return statusSchema.Validate(&str) == nil
 }
-
-type Deployment struct {
-	ID             int64
-	CommitHash     string
-	ComposeContent string
-	DeployedAt     time.Time
-	Status         DeploymentStatus
-	Message        string
-}
-
-type Store struct {
-	db *sql.DB
-}
-
-const schema = `
-CREATE TABLE IF NOT EXISTS deployments (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	commit_hash TEXT NOT NULL,
-	compose_content TEXT NOT NULL,
-	deployed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	status TEXT NOT NULL,
-	message TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_deployments_commit ON deployments(commit_hash);
-CREATE INDEX IF NOT EXISTS idx_deployments_deployed_at ON deployments(deployed_at DESC);
-`
 
 func New(ctx context.Context, path string) (*Store, error) {
 	db, err := sql.Open("sqlite", path)
@@ -82,7 +82,7 @@ func New(ctx context.Context, path string) (*Store, error) {
 		return nil, err
 	}
 
-	if _, err := db.ExecContext(ctx, schema); err != nil {
+	if err := runMigrations(db); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -94,13 +94,75 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-func (s *Store) SaveDeployment(ctx context.Context, commit, composeContent string, status DeploymentStatus, message string) (*Deployment, error) {
+func (s *Store) SaveRepo(ctx context.Context, name, url, branch string) (*Repo, error) {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO repos (name, url, branch) VALUES (?, ?, ?)`,
+		name, url, branch,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return s.GetRepo(ctx, name)
+}
+
+func (s *Store) GetRepo(ctx context.Context, name string) (*Repo, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT name, url, branch, created_at FROM repos WHERE name = ?`,
+		name,
+	)
+	var r Repo
+	err := row.Scan(&r.Name, &r.URL, &r.Branch, &r.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+func (s *Store) ListRepos(ctx context.Context) ([]*Repo, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT name, url, branch, created_at FROM repos ORDER BY name`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var repos []*Repo
+	for rows.Next() {
+		var r Repo
+		if err := rows.Scan(&r.Name, &r.URL, &r.Branch, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		repos = append(repos, &r)
+	}
+	return repos, rows.Err()
+}
+
+func (s *Store) DeleteRepo(ctx context.Context, name string) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM repos WHERE name = ?`, name)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) SaveDeployment(ctx context.Context, repoName, commit, composeContent string, status DeploymentStatus, message string) (*Deployment, error) {
 	if !status.IsValid() {
 		return nil, ErrInvalidStatus
 	}
 	result, err := s.db.ExecContext(ctx,
-		`INSERT INTO deployments (commit_hash, compose_content, status, message) VALUES (?, ?, ?, ?)`,
-		commit, composeContent, status, message,
+		`INSERT INTO deployments (repo_name, commit_hash, compose_content, status, message) VALUES (?, ?, ?, ?, ?)`,
+		repoName, commit, composeContent, status, message,
 	)
 	if err != nil {
 		return nil, err
@@ -116,34 +178,35 @@ func (s *Store) SaveDeployment(ctx context.Context, commit, composeContent strin
 
 func (s *Store) GetDeployment(ctx context.Context, id int64) (*Deployment, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, commit_hash, compose_content, deployed_at, status, message FROM deployments WHERE id = ?`,
+		`SELECT id, repo_name, commit_hash, compose_content, deployed_at, status, message FROM deployments WHERE id = ?`,
 		id,
 	)
 	return scanDeployment(row)
 }
 
-func (s *Store) GetLastDeployment(ctx context.Context) (*Deployment, error) {
+func (s *Store) GetLastDeployment(ctx context.Context, repoName string) (*Deployment, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, commit_hash, compose_content, deployed_at, status, message FROM deployments ORDER BY id DESC LIMIT 1`,
+		`SELECT id, repo_name, commit_hash, compose_content, deployed_at, status, message FROM deployments WHERE repo_name = ? ORDER BY id DESC LIMIT 1`,
+		repoName,
 	)
 	return scanDeployment(row)
 }
 
-func (s *Store) GetDeploymentByCommit(ctx context.Context, commit string) (*Deployment, error) {
+func (s *Store) GetDeploymentByCommit(ctx context.Context, repoName, commit string) (*Deployment, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, commit_hash, compose_content, deployed_at, status, message FROM deployments WHERE commit_hash = ? ORDER BY id DESC LIMIT 1`,
-		commit,
+		`SELECT id, repo_name, commit_hash, compose_content, deployed_at, status, message FROM deployments WHERE repo_name = ? AND commit_hash = ? ORDER BY id DESC LIMIT 1`,
+		repoName, commit,
 	)
 	return scanDeployment(row)
 }
 
-func (s *Store) ListDeployments(ctx context.Context, limit int) ([]*Deployment, error) {
+func (s *Store) ListDeployments(ctx context.Context, repoName string, limit int) ([]*Deployment, error) {
 	if limit <= 0 {
 		limit = DefaultListLimit
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, commit_hash, compose_content, deployed_at, status, message FROM deployments ORDER BY id DESC LIMIT ?`,
-		limit,
+		`SELECT id, repo_name, commit_hash, compose_content, deployed_at, status, message FROM deployments WHERE repo_name = ? ORDER BY id DESC LIMIT ?`,
+		repoName, limit,
 	)
 	if err != nil {
 		return nil, err
@@ -183,10 +246,33 @@ func (s *Store) UpdateDeploymentStatus(ctx context.Context, id int64, status Dep
 	return nil
 }
 
+func runMigrations(db *sql.DB) error {
+	source, err := iofs.New(migrations.FS, ".")
+	if err != nil {
+		return err
+	}
+
+	driver, err := sqlite.WithInstance(db, &sqlite.Config{})
+	if err != nil {
+		return err
+	}
+
+	m, err := migrate.NewWithInstance("iofs", source, "sqlite", driver)
+	if err != nil {
+		return err
+	}
+
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return err
+	}
+
+	return nil
+}
+
 func scanDeployment(row *sql.Row) (*Deployment, error) {
 	var d Deployment
 	var message sql.NullString
-	err := row.Scan(&d.ID, &d.CommitHash, &d.ComposeContent, &d.DeployedAt, &d.Status, &message)
+	err := row.Scan(&d.ID, &d.RepoName, &d.CommitHash, &d.ComposeContent, &d.DeployedAt, &d.Status, &message)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -200,7 +286,7 @@ func scanDeployment(row *sql.Row) (*Deployment, error) {
 func scanDeploymentRows(rows *sql.Rows) (*Deployment, error) {
 	var d Deployment
 	var message sql.NullString
-	err := rows.Scan(&d.ID, &d.CommitHash, &d.ComposeContent, &d.DeployedAt, &d.Status, &message)
+	err := rows.Scan(&d.ID, &d.RepoName, &d.CommitHash, &d.ComposeContent, &d.DeployedAt, &d.Status, &message)
 	if err != nil {
 		return nil, err
 	}
