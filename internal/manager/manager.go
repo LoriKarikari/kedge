@@ -76,8 +76,8 @@ func (m *Manager) Start(ctx context.Context, cfg Config) error {
 
 func (m *Manager) startRepo(ctx context.Context, repo *state.Repo, mgrCfg Config) error {
 	workDir := repoWorkDir(repo.Name)
-
 	watcher := git.NewWatcher(repo.URL, repo.Branch, workDir, config.Default().Git.PollInterval, m.logger)
+
 	if err := watcher.Clone(ctx); err != nil {
 		return fmt.Errorf("clone: %w", err)
 	}
@@ -91,8 +91,6 @@ func (m *Manager) startRepo(ctx context.Context, repo *state.Repo, mgrCfg Config
 	if err != nil {
 		mode = reconcile.ModeAuto
 	}
-
-	watcher = git.NewWatcher(repo.URL, repo.Branch, workDir, repoCfg.Git.PollInterval, m.logger)
 
 	ctrlCfg := controller.Config{
 		RepoName:     repo.Name,
