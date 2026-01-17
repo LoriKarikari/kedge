@@ -1,7 +1,52 @@
 site_name: Kedge
 site_description: GitOps for Docker Compose
+site_url: https://lorikarikari.github.io/kedge/
+
 theme:
   name: material
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+  icon:
+    repo: fontawesome/brands/github
+
+repo_url: https://github.com/LoriKarikari/kedge
+repo_name: LoriKarikari/kedge
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - tables
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Core Concepts: concepts.md
+  - Configuration: configuration.md
+  - CLI Reference:
+    - cli/index.md
+    - kedge repo:
+      - add: cli/repo/add.md
+      - list: cli/repo/list.md
+      - remove: cli/repo/remove.md
+    - kedge serve: cli/serve.md
+    - kedge status: cli/status.md
+    - kedge diff: cli/diff.md
+    - kedge sync: cli/sync.md
+    - kedge history: cli/history.md
+    - kedge rollback: cli/rollback.md
+    - kedge healthcheck: cli/healthcheck.md
+    - kedge version: cli/version.md
