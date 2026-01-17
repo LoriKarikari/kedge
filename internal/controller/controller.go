@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/LoriKarikari/kedge/internal/docker"
 	"github.com/LoriKarikari/kedge/internal/git"
@@ -31,7 +32,7 @@ type Controller struct {
 	config     Config
 	workDir    string
 	logger     *slog.Logger
-	ready      bool
+	ready      atomic.Bool
 }
 
 func New(ctx context.Context, watcher *git.Watcher, cfg Config, logger *slog.Logger) (*Controller, error) {
@@ -97,7 +98,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		return fmt.Errorf("initial reconcile: %w", err)
 	}
 
-	c.ready = true
+	c.ready.Store(true)
 
 	go c.watchDrift(ctx)
 
@@ -109,7 +110,7 @@ func (c *Controller) Run(ctx context.Context) error {
 }
 
 func (c *Controller) IsReady() bool {
-	return c.ready
+	return c.ready.Load()
 }
 
 func (c *Controller) watchDrift(ctx context.Context) {
