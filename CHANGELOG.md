@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/LoriKarikari/kedge/compare/v0.2.0...v0.3.0) (2026-01-17)
+
+
+### Features
+
+* add multi-repo support ([#34](https://github.com/LoriKarikari/kedge/issues/34)) ([88c2b15](https://github.com/LoriKarikari/kedge/commit/88c2b15d0c75cbb6ee0ca43b09e117baee7db660))
+* **manager:** continue running healthy repos when some fail ([#36](https://github.com/LoriKarikari/kedge/issues/36)) ([eb6beab](https://github.com/LoriKarikari/kedge/commit/eb6beab6c39047ea43cd9e2b3c5a5aaf7c619275))
+
 ## [0.2.0](https://github.com/LoriKarikari/kedge/compare/v0.1.0...v0.2.0) (2025-12-29)
 
 
