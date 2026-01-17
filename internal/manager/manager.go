@@ -145,6 +145,7 @@ func (m *Manager) startRepo(ctx context.Context, repo *state.Repo, mgrCfg Config
 		if err := ctrl.Run(ctx); err != nil && ctx.Err() == nil {
 			m.mu.Lock()
 			m.repoStatus[repo.Name] = &RepoStatus{Running: false, Error: err}
+			delete(m.controllers, repo.Name)
 			m.mu.Unlock()
 			m.logger.Error("controller stopped", slog.String("repo", repo.Name), slog.Any("error", err))
 		}
