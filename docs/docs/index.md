@@ -1,35 +1,60 @@
 # Kedge
 
-GitOps for Docker Compose.
+**GitOps for Docker Compose.** Push to Git, your containers update automatically.
 
-## What it does
+```bash
+kedge repo add https://github.com/you/app && kedge serve
+```
 
-Kedge watches a Git repository and automatically deploys your Docker Compose application when changes are detected. It also monitors for drift and auto-heals when containers stop or diverge from the desired state.
+---
 
-## Features
+## How It Works
 
-- **Git sync** - Watches a branch and deploys on push
-- **Drift detection** - Finds stopped or wrong-image containers
-- **Auto-reconciliation** - Restarts drifted services automatically
-- **Deployment history** - SQLite-backed history with rollback support
-- **Multiple modes** - Auto, notify, or manual reconciliation
+1. **You push** to your Git repository
+2. **Kedge detects** the change and pulls
+3. **Docker Compose** stack updates automatically
+4. **Drift happens?** Kedge fixes it
 
-## Quick start
+---
+
+## Install
 
 ```bash
 go install github.com/LoriKarikari/kedge/cmd/kedge@latest
-
-kedge serve --repo https://github.com/you/your-compose-repo --project myapp
 ```
 
-## Commands
+Or with Docker:
 
-| Command | Description |
-|---------|-------------|
-| `serve` | Start the GitOps controller |
-| `status` | Show current deployment status |
-| `diff` | Show drift between desired and actual state |
-| `sync` | Trigger immediate reconciliation |
-| `rollback` | Rollback to a previous deployment |
-| `history` | Show deployment history |
-| `version` | Print version information |
+```bash
+docker pull ghcr.io/lorikarikari/kedge:latest
+```
+
+---
+
+## Quick Start
+
+**1. Add `kedge.yaml` to your repo:**
+
+```yaml
+docker:
+  project_name: myapp
+  compose_file: docker-compose.yaml
+```
+
+**2. Register and run:**
+
+```bash
+kedge repo add https://github.com/you/your-app
+kedge serve
+```
+
+Done. Push to Git and watch it deploy.
+
+---
+
+## Next Steps
+
+- [Getting Started](getting-started.md) — Full setup guide
+- [Core Concepts](concepts.md) — Understand reconciliation and drift
+- [Configuration](configuration.md) — All config options
+- [CLI Reference](cli/index.md) — Every command documented
