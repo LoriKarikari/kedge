@@ -35,7 +35,7 @@ func TestNew(t *testing.T) {
 		},
 	}
 
-	ctrl, err := New(t.Context(), watcher, cfg, nil)
+	ctrl, err := New(t.Context(), watcher, cfg, nil, nil)
 	if err != nil {
 		t.Skipf("docker not available: %v", err)
 	}

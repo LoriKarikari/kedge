@@ -26,7 +26,7 @@ func newTestStore(t *testing.T) *state.Store {
 
 func TestNew(t *testing.T) {
 	store := newTestStore(t)
-	mgr := New(store, slog.Default())
+	mgr := New(store, nil, slog.Default())
 
 	if mgr.store != store {
 		t.Error("expected store to be set")
@@ -41,7 +41,7 @@ func TestNew(t *testing.T) {
 
 func TestIsReadyNoControllers(t *testing.T) {
 	store := newTestStore(t)
-	mgr := New(store, slog.Default())
+	mgr := New(store, nil, slog.Default())
 
 	if mgr.IsReady() {
 		t.Error("expected IsReady to return false with no controllers")
@@ -50,7 +50,7 @@ func TestIsReadyNoControllers(t *testing.T) {
 
 func TestStartNoRepos(t *testing.T) {
 	store := newTestStore(t)
-	mgr := New(store, slog.Default())
+	mgr := New(store, nil, slog.Default())
 
 	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
@@ -69,7 +69,7 @@ func TestStartAllReposFail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mgr := New(store, slog.Default())
+	mgr := New(store, nil, slog.Default())
 
 	err = mgr.Start(t.Context(), Config{
 		StatePath: filepath.Join(t.TempDir(), "state.db"),
@@ -108,7 +108,7 @@ func TestStartMultipleReposFail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mgr := New(store, slog.Default())
+	mgr := New(store, nil, slog.Default())
 
 	err = mgr.Start(t.Context(), Config{
 		StatePath: filepath.Join(t.TempDir(), "state.db"),
@@ -137,7 +137,7 @@ func TestStartMultipleReposFail(t *testing.T) {
 
 func TestStatusEmpty(t *testing.T) {
 	store := newTestStore(t)
-	mgr := New(store, slog.Default())
+	mgr := New(store, nil, slog.Default())
 
 	status := mgr.Status()
 	if len(status) != 0 {
@@ -147,7 +147,7 @@ func TestStatusEmpty(t *testing.T) {
 
 func TestClose(t *testing.T) {
 	store := newTestStore(t)
-	mgr := New(store, slog.Default())
+	mgr := New(store, nil, slog.Default())
 
 	err := mgr.Close()
 	if err != nil {
