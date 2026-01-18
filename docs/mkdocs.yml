@@ -36,6 +36,7 @@ nav:
   - Getting Started: getting-started.md
   - Core Concepts: concepts.md
   - Configuration: configuration.md
+  - Telemetry: telemetry.md
   - CLI Reference:
     - cli/index.md
     - kedge repo:
