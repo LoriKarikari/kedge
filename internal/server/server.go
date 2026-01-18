@@ -11,6 +11,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
+
+	"github.com/LoriKarikari/kedge/internal/telemetry"
 )
 
 type ReadinessChecker interface {
@@ -18,9 +20,10 @@ type ReadinessChecker interface {
 }
 
 type Server struct {
-	server  *http.Server
-	checker ReadinessChecker
-	logger  *slog.Logger
+	server    *http.Server
+	checker   ReadinessChecker
+	telemetry *telemetry.Provider
+	logger    *slog.Logger
 }
 
 type HealthOutput struct {
@@ -36,7 +39,7 @@ type ReadyOutput struct {
 	}
 }
 
-func New(port int, checker ReadinessChecker, logger *slog.Logger) *Server {
+func New(port int, checker ReadinessChecker, tp *telemetry.Provider, logger *slog.Logger) *Server {
 	mux := http.NewServeMux()
 	api := humago.New(mux, huma.DefaultConfig("Kedge API", "1.0.0"))
 
@@ -53,8 +56,9 @@ func New(port int, checker ReadinessChecker, logger *slog.Logger) *Server {
 			WriteTimeout:      15 * time.Second,
 			IdleTimeout:       120 * time.Second,
 		},
-		checker: checker,
-		logger:  logger,
+		checker:   checker,
+		telemetry: tp,
+		logger:    logger,
 	}
 
 	huma.Register(api, huma.Operation{
@@ -70,6 +74,10 @@ func New(port int, checker ReadinessChecker, logger *slog.Logger) *Server {
 		Path:        "/ready",
 		Summary:     "Readiness check",
 	}, s.handleReady)
+
+	if tp != nil {
+		mux.Handle("/metrics", tp.Handler())
+	}
 
 	return s
 }

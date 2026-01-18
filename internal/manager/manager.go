@@ -15,6 +15,7 @@ import (
 	"github.com/LoriKarikari/kedge/internal/git"
 	"github.com/LoriKarikari/kedge/internal/reconcile"
 	"github.com/LoriKarikari/kedge/internal/state"
+	"github.com/LoriKarikari/kedge/internal/telemetry"
 )
 
 type Config struct {
@@ -29,15 +30,17 @@ type RepoStatus struct {
 
 type Manager struct {
 	store       *state.Store
+	telemetry   *telemetry.Provider
 	controllers map[string]*controller.Controller
 	repoStatus  map[string]*RepoStatus
 	logger      *slog.Logger
 	mu          sync.RWMutex
 }
 
-func New(store *state.Store, logger *slog.Logger) *Manager {
+func New(store *state.Store, tp *telemetry.Provider, logger *slog.Logger) *Manager {
 	return &Manager{
 		store:       store,
+		telemetry:   tp,
 		controllers: make(map[string]*controller.Controller),
 		repoStatus:  make(map[string]*RepoStatus),
 		logger:      logger.With(slog.String("component", "manager")),
@@ -96,7 +99,14 @@ func (m *Manager) Start(ctx context.Context, cfg Config) error {
 
 func (m *Manager) startRepo(ctx context.Context, repo *state.Repo, mgrCfg Config) error {
 	workDir := repoWorkDir(repo.Name)
-	watcher := git.NewWatcher(repo.URL, repo.Branch, workDir, config.Default().Git.PollInterval, m.logger)
+
+	var watcherOpts []git.WatcherOption
+	watcherOpts = append(watcherOpts, git.WithRepoName(repo.Name))
+	if m.telemetry != nil {
+		watcherOpts = append(watcherOpts, git.WithMetrics(m.telemetry.Metrics))
+	}
+
+	watcher := git.NewWatcher(repo.URL, repo.Branch, workDir, config.Default().Git.PollInterval, m.logger, watcherOpts...)
 
 	if err := watcher.Clone(ctx); err != nil {
 		m.mu.Lock()
@@ -126,7 +136,11 @@ func (m *Manager) startRepo(ctx context.Context, repo *state.Repo, mgrCfg Config
 		ReconcileCfg: reconcile.Config{Mode: mode},
 	}
 
-	ctrl, err := controller.New(ctx, watcher, ctrlCfg, m.logger)
+	var metrics *telemetry.Metrics
+	if m.telemetry != nil {
+		metrics = m.telemetry.Metrics
+	}
+	ctrl, err := controller.New(ctx, watcher, ctrlCfg, metrics, m.logger)
 	if err != nil {
 		m.mu.Lock()
 		m.repoStatus[repo.Name] = &RepoStatus{Running: false, Error: fmt.Errorf("create controller: %w", err)}

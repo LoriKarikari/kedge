@@ -41,7 +41,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		ReconcileCfg: reconcile.Config{Mode: reconcile.ModeAuto},
 	}
 
-	ctrl, err := controller.NewStandalone(ctx, ctrlCfg, logger)
+	ctrl, err := controller.NewStandalone(ctx, ctrlCfg, nil, logger)
 	if err != nil {
 		return err
 	}

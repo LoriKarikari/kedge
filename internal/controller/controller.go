@@ -7,11 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	"github.com/LoriKarikari/kedge/internal/docker"
 	"github.com/LoriKarikari/kedge/internal/git"
 	"github.com/LoriKarikari/kedge/internal/reconcile"
 	"github.com/LoriKarikari/kedge/internal/state"
+	"github.com/LoriKarikari/kedge/internal/telemetry"
 	"github.com/samber/lo"
 )
 
@@ -29,14 +31,15 @@ type Controller struct {
 	client     *docker.Client
 	reconciler *reconcile.Reconciler
 	store      *state.Store
+	metrics    *telemetry.Metrics
 	config     Config
 	workDir    string
 	logger     *slog.Logger
 	ready      atomic.Bool
 }
 
-func New(ctx context.Context, watcher *git.Watcher, cfg Config, logger *slog.Logger) (*Controller, error) {
-	ctrl, err := newController(ctx, cfg, logger)
+func New(ctx context.Context, watcher *git.Watcher, cfg Config, metrics *telemetry.Metrics, logger *slog.Logger) (*Controller, error) {
+	ctrl, err := newController(ctx, cfg, metrics, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -45,11 +48,11 @@ func New(ctx context.Context, watcher *git.Watcher, cfg Config, logger *slog.Log
 	return ctrl, nil
 }
 
-func NewStandalone(ctx context.Context, cfg Config, logger *slog.Logger) (*Controller, error) {
+func NewStandalone(ctx context.Context, cfg Config, metrics *telemetry.Metrics, logger *slog.Logger) (*Controller, error) {
 	if cfg.WorkDir == "" {
 		return nil, fmt.Errorf("workdir is required")
 	}
-	ctrl, err := newController(ctx, cfg, logger)
+	ctrl, err := newController(ctx, cfg, metrics, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +60,7 @@ func NewStandalone(ctx context.Context, cfg Config, logger *slog.Logger) (*Contr
 	return ctrl, nil
 }
 
-func newController(ctx context.Context, cfg Config, logger *slog.Logger) (*Controller, error) {
+func newController(ctx context.Context, cfg Config, metrics *telemetry.Metrics, logger *slog.Logger) (*Controller, error) {
 	if filepath.IsAbs(cfg.ComposePath) {
 		return nil, fmt.Errorf("compose path must be relative: %s", cfg.ComposePath)
 	}
@@ -84,6 +87,7 @@ func newController(ctx context.Context, cfg Config, logger *slog.Logger) (*Contr
 		client:     client,
 		reconciler: reconciler,
 		store:      store,
+		metrics:    metrics,
 		config:     cfg,
 		logger:     logger,
 	}, nil
@@ -122,18 +126,23 @@ func (c *Controller) watchDrift(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case result := <-results:
-			c.handleDriftResult(result)
+			c.handleDriftResult(ctx, result)
 		}
 	}
 }
 
-func (c *Controller) handleDriftResult(result *reconcile.Result) {
+func (c *Controller) handleDriftResult(ctx context.Context, result *reconcile.Result) {
 	if result.Error != nil {
 		c.logger.Error("drift check failed", slog.Any("error", result.Error))
 		return
 	}
 	if result.Reconciled {
 		c.logger.Info("drift reconciled", slog.Int("changes", len(result.Changes)))
+		if c.metrics != nil {
+			for _, change := range result.Changes {
+				c.metrics.RecordDrift(ctx, c.config.RepoName, change.Service)
+			}
+		}
 	}
 }
 
@@ -166,19 +175,27 @@ func (c *Controller) loadAndReconcile(ctx context.Context, commit string) error 
 		c.logger.Warn("failed to save deployment", slog.Any("error", err))
 	}
 
+	start := time.Now()
 	result := c.reconciler.Reconcile(ctx)
+	duration := time.Since(start)
+
+	var status state.DeploymentStatus
+	var message string
+	switch {
+	case result.Error != nil:
+		status, message = state.StatusFailed, result.Error.Error()
+	case result.Reconciled:
+		status = state.StatusSuccess
+	default:
+		status, message = state.StatusSkipped, "no changes applied"
+	}
+
+	if c.metrics != nil {
+		c.metrics.RecordDeployment(ctx, c.config.RepoName, string(status))
+		c.metrics.RecordReconciliation(ctx, c.config.RepoName, duration, result.Error == nil)
+	}
 
 	if deployment != nil {
-		var status state.DeploymentStatus
-		var message string
-		switch {
-		case result.Error != nil:
-			status, message = state.StatusFailed, result.Error.Error()
-		case result.Reconciled:
-			status = state.StatusSuccess
-		default:
-			status, message = state.StatusSkipped, "no changes applied"
-		}
 		if err := c.store.UpdateDeploymentStatus(ctx, deployment.ID, status, message); err != nil {
 			c.logger.Warn("failed to update deployment status", slog.Any("error", err))
 		}

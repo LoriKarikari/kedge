@@ -50,6 +50,9 @@ While running, Kedge exposes HTTP endpoints:
 |----------|-------------|---------|
 | `GET /health` | Server is running | `200 OK` |
 | `GET /ready` | At least one repo is synced | `200 OK` |
+| `GET /metrics` | Prometheus metrics | `200 OK` |
+
+For detailed metrics documentation, see [Telemetry](../telemetry.md).
 
 Default port: `8080`. Configure in `~/.config/kedge/config.yaml`:
 

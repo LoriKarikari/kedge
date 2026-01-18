@@ -11,6 +11,8 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+
+	"github.com/LoriKarikari/kedge/internal/telemetry"
 )
 
 type ChangeEvent struct {
@@ -20,28 +22,48 @@ type ChangeEvent struct {
 }
 
 type Watcher struct {
+	repoName     string
 	repoURL      string
 	branch       string
 	workDir      string
 	pollInterval time.Duration
 	repo         *git.Repository
+	metrics      *telemetry.Metrics
 	logger       *slog.Logger
 
 	mu         sync.RWMutex
 	lastCommit string
 }
 
-func NewWatcher(repoURL, branch, workDir string, pollInterval time.Duration, logger *slog.Logger) *Watcher {
+type WatcherOption func(*Watcher)
+
+func WithMetrics(metrics *telemetry.Metrics) WatcherOption {
+	return func(w *Watcher) {
+		w.metrics = metrics
+	}
+}
+
+func WithRepoName(name string) WatcherOption {
+	return func(w *Watcher) {
+		w.repoName = name
+	}
+}
+
+func NewWatcher(repoURL, branch, workDir string, pollInterval time.Duration, logger *slog.Logger, opts ...WatcherOption) *Watcher {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &Watcher{
+	w := &Watcher{
 		repoURL:      repoURL,
 		branch:       branch,
 		workDir:      workDir,
 		pollInterval: pollInterval,
 		logger:       logger.With(slog.String("component", "watcher")),
 	}
+	for _, opt := range opts {
+		opt(w)
+	}
+	return w
 }
 
 func (w *Watcher) Clone(ctx context.Context) error {
@@ -195,7 +217,14 @@ func (w *Watcher) pollLoop(ctx context.Context, ticker *time.Ticker, events chan
 }
 
 func (w *Watcher) handleTick(ctx context.Context, events chan<- ChangeEvent) {
+	start := time.Now()
 	changed, hash, err := w.Pull(ctx)
+	duration := time.Since(start)
+
+	if w.metrics != nil {
+		w.metrics.RecordGitPoll(ctx, w.repoName, duration, err == nil)
+	}
+
 	if err != nil {
 		w.logger.Error("failed to pull", slog.Any("error", err))
 		return
