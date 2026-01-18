@@ -17,6 +17,7 @@ type Config struct {
 	State          State          `yaml:"state"`
 	Logging        Logging        `yaml:"logging"`
 	Server         Server         `yaml:"server"`
+	Telemetry      Telemetry      `yaml:"telemetry"`
 }
 
 type Git struct {
@@ -49,6 +50,14 @@ type Server struct {
 	Port int `yaml:"port"`
 }
 
+type Telemetry struct {
+	Metrics MetricsConfig `yaml:"metrics"`
+}
+
+type MetricsConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
 func Default() *Config {
 	return &Config{
 		Git: Git{
@@ -73,6 +82,11 @@ func Default() *Config {
 		},
 		Server: Server{
 			Port: 8080,
+		},
+		Telemetry: Telemetry{
+			Metrics: MetricsConfig{
+				Enabled: true,
+			},
 		},
 	}
 }

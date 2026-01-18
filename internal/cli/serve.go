@@ -15,6 +15,7 @@ import (
 	"github.com/LoriKarikari/kedge/internal/manager"
 	"github.com/LoriKarikari/kedge/internal/server"
 	"github.com/LoriKarikari/kedge/internal/state"
+	"github.com/LoriKarikari/kedge/internal/telemetry"
 )
 
 var serveCmd = &cobra.Command{
@@ -44,10 +45,27 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	defer store.Close()
 
-	mgr := manager.New(store, logger)
+	var tp *telemetry.Provider
+	if cfg.Telemetry.Metrics.Enabled {
+		tp, err = telemetry.New()
+		if err != nil {
+			return fmt.Errorf("init telemetry: %w", err)
+		}
+		tp.SetGlobal()
+		defer func() {
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer shutdownCancel()
+			if err := tp.Shutdown(shutdownCtx); err != nil {
+				logger.Error("telemetry shutdown error", slog.Any("error", err))
+			}
+		}()
+		logger.Info("telemetry enabled", slog.String("endpoint", "/metrics"))
+	}
+
+	mgr := manager.New(store, tp, logger)
 	defer mgr.Close()
 
-	srv := server.New(cfg.Server.Port, mgr, logger)
+	srv := server.New(cfg.Server.Port, mgr, tp, logger)
 	if err := srv.Start(ctx); err != nil {
 		return fmt.Errorf("start server: %w", err)
 	}
