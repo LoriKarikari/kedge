@@ -7,7 +7,7 @@ require (
 	github.com/charmbracelet/huh v0.8.0
 	github.com/compose-spec/compose-go/v2 v2.10.1
 	github.com/containerd/errdefs v1.0.0
-	github.com/danielgtaylor/huma/v2 v2.34.1
+	github.com/danielgtaylor/huma/v2 v2.35.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.6.0
 	github.com/go-git/go-git/v5 v5.16.4
