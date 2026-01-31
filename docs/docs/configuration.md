@@ -96,6 +96,57 @@ logging:
 |-------|------|---------|-------------|
 | `poll_interval` | duration | `60s` | How often to check for Git changes |
 
+---
+
+## Private Repository Authentication
+
+Kedge supports SSH keys and HTTPS tokens for accessing private repositories.
+
+### SSH Authentication
+
+```bash
+kedge repo add git@github.com:org/private-repo.git \
+  --ssh-private-key-path ~/.ssh/deploy_key
+```
+
+If you add an SSH URL without specifying a key, Kedge will prompt for the path interactively.
+
+!!! warning "SSH Key Permissions"
+    Kedge warns if your SSH key has permissions greater than `0600`. Run `chmod 600 ~/.ssh/your_key` to fix.
+
+### HTTPS Token Authentication
+
+```bash
+# Set your token in an environment variable
+export GITHUB_TOKEN=ghp_xxxxx
+
+# Add the repository
+kedge repo add https://github.com/org/private-repo.git \
+  --password-env GITHUB_TOKEN
+```
+
+For providers requiring a username:
+
+```bash
+kedge repo add https://github.com/org/private-repo.git \
+  --username x-access-token \
+  --password-env GITHUB_TOKEN
+```
+
+### CLI Flags
+
+| Flag | Description |
+|------|-------------|
+| `--ssh-private-key-path` | Path to SSH private key |
+| `--username` | Username for HTTPS auth (default: `x-access-token`) |
+| `--password-env` | Environment variable name containing the token |
+
+### Security
+
+- **Secrets are never stored** - only references (file paths, env var names)
+- SSH key contents are never saved to the database
+- Tokens are read from environment variables at runtime
+
 #### `logging`
 
 | Field | Type | Default | Description |

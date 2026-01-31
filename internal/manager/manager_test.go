@@ -64,7 +64,7 @@ func TestStartNoRepos(t *testing.T) {
 func TestStartAllReposFail(t *testing.T) {
 	store := newTestStore(t)
 
-	_, err := store.SaveRepo(t.Context(), testRepoName, "https://github.com/octocat/Hello-World.git", "master")
+	_, err := store.SaveRepo(t.Context(), testRepoName, "https://github.com/octocat/Hello-World.git", "master", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,11 +99,11 @@ func TestStartAllReposFail(t *testing.T) {
 func TestStartMultipleReposFail(t *testing.T) {
 	store := newTestStore(t)
 
-	_, err := store.SaveRepo(t.Context(), "repo1", "https://github.com/octocat/Hello-World.git", "master")
+	_, err := store.SaveRepo(t.Context(), "repo1", "https://github.com/octocat/Hello-World.git", "master", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = store.SaveRepo(t.Context(), "repo2", "https://github.com/octocat/Spoon-Knife.git", "main")
+	_, err = store.SaveRepo(t.Context(), "repo2", "https://github.com/octocat/Spoon-Knife.git", "main", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

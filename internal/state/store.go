@@ -27,10 +27,21 @@ type Store struct {
 }
 
 type Repo struct {
-	Name      string
-	URL       string
-	Branch    string
-	CreatedAt time.Time
+	Name        string
+	URL         string
+	Branch      string
+	CreatedAt   time.Time
+	AuthType    string
+	SSHKeyPath  string
+	Username    string
+	PasswordEnv string
+}
+
+type RepoAuth struct {
+	Type        string
+	SSHKeyPath  string
+	Username    string
+	PasswordEnv string
 }
 
 type Deployment struct {
@@ -94,10 +105,18 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-func (s *Store) SaveRepo(ctx context.Context, name, url, branch string) (*Repo, error) {
+func (s *Store) SaveRepo(ctx context.Context, name, url, branch string, auth *RepoAuth) (*Repo, error) {
+	var authType, sshKeyPath, username, passwordEnv any
+	if auth != nil {
+		authType = nullString(auth.Type)
+		sshKeyPath = nullString(auth.SSHKeyPath)
+		username = nullString(auth.Username)
+		passwordEnv = nullString(auth.PasswordEnv)
+	}
+
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO repos (name, url, branch) VALUES (?, ?, ?)`,
-		name, url, branch,
+		`INSERT INTO repos (name, url, branch, auth_type, auth_ssh_key_path, auth_username, auth_password_env) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		name, url, branch, authType, sshKeyPath, username, passwordEnv,
 	)
 	if err != nil {
 		return nil, err
@@ -105,25 +124,45 @@ func (s *Store) SaveRepo(ctx context.Context, name, url, branch string) (*Repo, 
 	return s.GetRepo(ctx, name)
 }
 
+func nullString(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 func (s *Store) GetRepo(ctx context.Context, name string) (*Repo, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT name, url, branch, created_at FROM repos WHERE name = ?`,
+		`SELECT name, url, branch, created_at, auth_type, auth_ssh_key_path, auth_username, auth_password_env FROM repos WHERE name = ?`,
 		name,
 	)
-	var r Repo
-	err := row.Scan(&r.Name, &r.URL, &r.Branch, &r.CreatedAt)
+	r, err := scanRepo(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
+	return r, nil
+}
+
+func scanRepo(row *sql.Row) (*Repo, error) {
+	var r Repo
+	var authType, sshKeyPath, username, passwordEnv sql.NullString
+	err := row.Scan(&r.Name, &r.URL, &r.Branch, &r.CreatedAt, &authType, &sshKeyPath, &username, &passwordEnv)
+	if err != nil {
+		return nil, err
+	}
+	r.AuthType = authType.String
+	r.SSHKeyPath = sshKeyPath.String
+	r.Username = username.String
+	r.PasswordEnv = passwordEnv.String
 	return &r, nil
 }
 
 func (s *Store) ListRepos(ctx context.Context) ([]*Repo, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT name, url, branch, created_at FROM repos ORDER BY name`,
+		`SELECT name, url, branch, created_at, auth_type, auth_ssh_key_path, auth_username, auth_password_env FROM repos ORDER BY name`,
 	)
 	if err != nil {
 		return nil, err
@@ -132,13 +171,27 @@ func (s *Store) ListRepos(ctx context.Context) ([]*Repo, error) {
 
 	var repos []*Repo
 	for rows.Next() {
-		var r Repo
-		if err := rows.Scan(&r.Name, &r.URL, &r.Branch, &r.CreatedAt); err != nil {
+		r, err := scanRepoRows(rows)
+		if err != nil {
 			return nil, err
 		}
-		repos = append(repos, &r)
+		repos = append(repos, r)
 	}
 	return repos, rows.Err()
+}
+
+func scanRepoRows(rows *sql.Rows) (*Repo, error) {
+	var r Repo
+	var authType, sshKeyPath, username, passwordEnv sql.NullString
+	err := rows.Scan(&r.Name, &r.URL, &r.Branch, &r.CreatedAt, &authType, &sshKeyPath, &username, &passwordEnv)
+	if err != nil {
+		return nil, err
+	}
+	r.AuthType = authType.String
+	r.SSHKeyPath = sshKeyPath.String
+	r.Username = username.String
+	r.PasswordEnv = passwordEnv.String
+	return &r, nil
 }
 
 func (s *Store) DeleteRepo(ctx context.Context, name string) error {
