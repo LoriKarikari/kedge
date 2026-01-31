@@ -11,7 +11,9 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 
+	"github.com/LoriKarikari/kedge/internal/git/auth"
 	"github.com/LoriKarikari/kedge/internal/telemetry"
 )
 
@@ -30,6 +32,7 @@ type Watcher struct {
 	repo         *git.Repository
 	metrics      *telemetry.Metrics
 	logger       *slog.Logger
+	auth         transport.AuthMethod
 
 	mu         sync.RWMutex
 	lastCommit string
@@ -46,6 +49,22 @@ func WithMetrics(metrics *telemetry.Metrics) WatcherOption {
 func WithRepoName(name string) WatcherOption {
 	return func(w *Watcher) {
 		w.repoName = name
+	}
+}
+
+func WithAuth(authCfg *auth.Config, logger *slog.Logger) WatcherOption {
+	return func(w *Watcher) {
+		if authCfg == nil || authCfg.IsEmpty() {
+			return
+		}
+		authMethod, err := authCfg.Resolve(logger)
+		if err != nil {
+			if logger != nil {
+				logger.Error("failed to resolve auth config", slog.Any("error", err))
+			}
+			return
+		}
+		w.auth = authMethod
 	}
 }
 
@@ -85,6 +104,7 @@ func (w *Watcher) clone(ctx context.Context) error {
 		URL:           w.repoURL,
 		ReferenceName: plumbing.NewBranchReferenceName(w.branch),
 		SingleBranch:  true,
+		Auth:          w.auth,
 	})
 	if err != nil {
 		return err
@@ -106,6 +126,7 @@ func (w *Watcher) Pull(ctx context.Context) (changed bool, hash string, err erro
 		RemoteName:    "origin",
 		ReferenceName: plumbing.NewBranchReferenceName(w.branch),
 		SingleBranch:  true,
+		Auth:          w.auth,
 	})
 
 	if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
@@ -141,6 +162,7 @@ func (w *Watcher) hardReset(ctx context.Context) error {
 	if err := w.repo.FetchContext(ctx, &git.FetchOptions{
 		RemoteName: "origin",
 		Force:      true,
+		Auth:       w.auth,
 	}); err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
 		return err
 	}

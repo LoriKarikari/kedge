@@ -10,7 +10,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // sqlite driver
 
 	"github.com/LoriKarikari/kedge/internal/state/migrations"
 )

@@ -13,6 +13,7 @@ import (
 	"github.com/LoriKarikari/kedge/internal/config"
 	"github.com/LoriKarikari/kedge/internal/controller"
 	"github.com/LoriKarikari/kedge/internal/git"
+	"github.com/LoriKarikari/kedge/internal/git/auth"
 	"github.com/LoriKarikari/kedge/internal/reconcile"
 	"github.com/LoriKarikari/kedge/internal/state"
 	"github.com/LoriKarikari/kedge/internal/telemetry"
@@ -104,6 +105,16 @@ func (m *Manager) startRepo(ctx context.Context, repo *state.Repo, mgrCfg Config
 	watcherOpts = append(watcherOpts, git.WithRepoName(repo.Name))
 	if m.telemetry != nil {
 		watcherOpts = append(watcherOpts, git.WithMetrics(m.telemetry.Metrics))
+	}
+
+	if repo.AuthType != "" {
+		authCfg := &auth.Config{
+			Type:        auth.Type(repo.AuthType),
+			SSHKeyPath:  repo.SSHKeyPath,
+			Username:    repo.Username,
+			PasswordEnv: repo.PasswordEnv,
+		}
+		watcherOpts = append(watcherOpts, git.WithAuth(authCfg, m.logger))
 	}
 
 	watcher := git.NewWatcher(repo.URL, repo.Branch, workDir, config.Default().Git.PollInterval, m.logger, watcherOpts...)
