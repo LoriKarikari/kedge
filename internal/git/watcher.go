@@ -33,6 +33,7 @@ type Watcher struct {
 	metrics      *telemetry.Metrics
 	logger       *slog.Logger
 	auth         transport.AuthMethod
+	authErr      error
 
 	mu         sync.RWMutex
 	lastCommit string
@@ -59,9 +60,7 @@ func WithAuth(authCfg *auth.Config, logger *slog.Logger) WatcherOption {
 		}
 		authMethod, err := authCfg.Resolve(logger)
 		if err != nil {
-			if logger != nil {
-				logger.Error("failed to resolve auth config", slog.Any("error", err))
-			}
+			w.authErr = fmt.Errorf("resolve auth: %w", err)
 			return
 		}
 		w.auth = authMethod
@@ -86,6 +85,10 @@ func NewWatcher(repoURL, branch, workDir string, pollInterval time.Duration, log
 }
 
 func (w *Watcher) Clone(ctx context.Context) error {
+	if w.authErr != nil {
+		return w.authErr
+	}
+
 	if _, err := os.Stat(w.workDir); err == nil {
 		repo, err := git.PlainOpen(w.workDir)
 		if err != nil {
