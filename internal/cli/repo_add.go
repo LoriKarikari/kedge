@@ -62,7 +62,7 @@ func runRepoAdd(cmd *cobra.Command, args []string) error {
 	}
 	defer store.Close()
 
-	repo, err := store.SaveRepo(ctx, name, repoURL, repoAddFlags.branch)
+	repo, err := store.SaveRepo(ctx, name, repoURL, repoAddFlags.branch, nil)
 	if err != nil {
 		return fmt.Errorf("save repo: %w", err)
 	}

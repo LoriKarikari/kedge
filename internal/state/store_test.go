@@ -19,7 +19,7 @@ func newTestStore(t *testing.T) *Store {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
-	_, err = store.SaveRepo(t.Context(), testRepoName, "https://example.com/repo.git", "main")
+	_, err = store.SaveRepo(t.Context(), testRepoName, "https://example.com/repo.git", "main", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
