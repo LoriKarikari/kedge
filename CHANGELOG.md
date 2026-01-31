@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/LoriKarikari/kedge/compare/v0.3.0...v0.4.0) (2026-01-31)
+
+
+### Features
+
+* add auth package and database schema for private repo support ([#44](https://github.com/LoriKarikari/kedge/issues/44)) ([c8890a7](https://github.com/LoriKarikari/kedge/commit/c8890a70f9b4654484b58bfdd1628b10fe757bcf))
+* add OpenTelemetry metrics and telemetry documentation ([#38](https://github.com/LoriKarikari/kedge/issues/38)) ([137e18a](https://github.com/LoriKarikari/kedge/commit/137e18aad36cb00b9d51c79c8b97c86d7d246937))
+
 ## [0.3.0](https://github.com/LoriKarikari/kedge/compare/v0.2.0...v0.3.0) (2026-01-17)
 
 
