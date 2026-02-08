@@ -3,6 +3,9 @@ package server
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -13,6 +16,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
+	"github.com/LoriKarikari/kedge/internal/config"
 	"github.com/LoriKarikari/kedge/internal/manager"
 	"github.com/LoriKarikari/kedge/internal/state"
 )
@@ -22,6 +26,8 @@ const (
 	contentTypeJSON = "application/json"
 	wantStatusFmt   = "status: got %d, want %d"
 	wantFieldFmt    = "got %q, want %q"
+	testSecret      = "test-webhook-secret"
+	testSecretEnv   = "KEDGE_TEST_WEBHOOK_SECRET"
 )
 
 type mockService struct {
@@ -58,14 +64,14 @@ func newMockService(t *testing.T, repos map[string]*state.Repo) *mockService {
 	return &mockService{repos: repos, store: store}
 }
 
-func newTestWebhookServer(t *testing.T, svc Service) (*httptest.Server, *http.Client) {
+func newTestWebhookServer(t *testing.T, svc Service, cfg ServerConfig) (*httptest.Server, *http.Client) {
 	t.Helper()
 	mux := http.NewServeMux()
 	api := humago.New(mux, huma.DefaultConfig("Test", "1.0.0"))
 
 	s := &Server{
 		svc:    svc,
-		cfg:    ServerConfig{},
+		cfg:    cfg,
 		logger: slog.Default(),
 	}
 
@@ -111,9 +117,15 @@ func decodeResponse(t *testing.T, resp *http.Response) (string, string) {
 	return result.Status, result.Repo
 }
 
+func signGitHubPayload(secret, body string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(body))
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+}
+
 func TestWebhookEndpointNoMatchingRepo(t *testing.T) {
 	svc := newMockService(t, map[string]*state.Repo{})
-	ts, client := newTestWebhookServer(t, svc)
+	ts, client := newTestWebhookServer(t, svc, ServerConfig{})
 
 	resp := postWebhook(t, client, ts.URL,
 		`{"ref":"refs/heads/main","after":"abc123def456","repository":{"clone_url":"https://github.com/test/nonexistent.git"}}`,
@@ -130,7 +142,7 @@ func TestWebhookEndpointNoMatchingRepo(t *testing.T) {
 
 func TestWebhookEndpointTagRefRejected(t *testing.T) {
 	svc := newMockService(t, map[string]*state.Repo{})
-	ts, client := newTestWebhookServer(t, svc)
+	ts, client := newTestWebhookServer(t, svc, ServerConfig{})
 
 	resp := postWebhook(t, client, ts.URL,
 		`{"ref":"refs/tags/v1.0.0","after":"abc123","repository":{"clone_url":"https://github.com/test/repo.git"}}`,
@@ -142,15 +154,36 @@ func TestWebhookEndpointTagRefRejected(t *testing.T) {
 	resp.Body.Close()
 }
 
-func TestWebhookEndpointBranchMismatch(t *testing.T) {
+func TestWebhookEndpointNoSecretConfigured(t *testing.T) {
 	svc := newMockService(t, map[string]*state.Repo{
 		"myrepo": {Name: "myrepo", URL: "https://github.com/org/repo.git", Branch: "main"},
 	})
-	ts, client := newTestWebhookServer(t, svc)
+	ts, client := newTestWebhookServer(t, svc, ServerConfig{})
 
-	resp := postWebhook(t, client, ts.URL,
-		`{"ref":"refs/heads/develop","after":"abc123def456","repository":{"clone_url":"https://github.com/org/repo.git"}}`,
+	body := `{"ref":"refs/heads/main","after":"abc123def456","repository":{"clone_url":"https://github.com/org/repo.git"}}`
+	resp := postWebhook(t, client, ts.URL, body,
 		map[string]string{headerGitHubEvent: "push"})
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf(wantStatusFmt, resp.StatusCode, http.StatusUnauthorized)
+	}
+	resp.Body.Close()
+}
+
+func TestWebhookEndpointBranchMismatch(t *testing.T) {
+	t.Setenv(testSecretEnv, testSecret)
+	svc := newMockService(t, map[string]*state.Repo{
+		"myrepo": {Name: "myrepo", URL: "https://github.com/org/repo.git", Branch: "main"},
+	})
+	cfg := ServerConfig{Webhook: config.Webhook{SecretEnv: testSecretEnv}}
+	ts, client := newTestWebhookServer(t, svc, cfg)
+
+	body := `{"ref":"refs/heads/develop","after":"abc123def456","repository":{"clone_url":"https://github.com/org/repo.git"}}`
+	resp := postWebhook(t, client, ts.URL, body,
+		map[string]string{
+			headerGitHubEvent:     "push",
+			"X-Hub-Signature-256": signGitHubPayload(testSecret, body),
+		})
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf(wantStatusFmt, resp.StatusCode, http.StatusOK)
@@ -165,14 +198,19 @@ func TestWebhookEndpointBranchMismatch(t *testing.T) {
 }
 
 func TestWebhookEndpointSyncTriggered(t *testing.T) {
+	t.Setenv(testSecretEnv, testSecret)
 	svc := newMockService(t, map[string]*state.Repo{
 		"myrepo": {Name: "myrepo", URL: "https://github.com/org/repo.git", Branch: "main"},
 	})
-	ts, client := newTestWebhookServer(t, svc)
+	cfg := ServerConfig{Webhook: config.Webhook{SecretEnv: testSecretEnv}}
+	ts, client := newTestWebhookServer(t, svc, cfg)
 
-	resp := postWebhook(t, client, ts.URL,
-		`{"ref":"refs/heads/main","after":"abc123def456","repository":{"clone_url":"https://github.com/org/repo.git"}}`,
-		map[string]string{headerGitHubEvent: "push"})
+	body := `{"ref":"refs/heads/main","after":"abc123def456","repository":{"clone_url":"https://github.com/org/repo.git"}}`
+	resp := postWebhook(t, client, ts.URL, body,
+		map[string]string{
+			headerGitHubEvent:     "push",
+			"X-Hub-Signature-256": signGitHubPayload(testSecret, body),
+		})
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf(wantStatusFmt, resp.StatusCode, http.StatusOK)
@@ -188,7 +226,7 @@ func TestWebhookEndpointSyncTriggered(t *testing.T) {
 
 func TestWebhookEndpointInvalidJSON(t *testing.T) {
 	svc := newMockService(t, map[string]*state.Repo{})
-	ts, client := newTestWebhookServer(t, svc)
+	ts, client := newTestWebhookServer(t, svc, ServerConfig{})
 
 	resp := postWebhook(t, client, ts.URL, `not json`, nil)
 

@@ -47,6 +47,10 @@ func (s *Server) handleWebhook(ctx context.Context, input *WebhookInput) (*Webho
 	}
 
 	secret := resolveSecret(repo, s.cfg.Webhook.SecretEnv)
+	if secret == "" {
+		s.logger.Warn("webhook rejected, no secret configured", slog.String("repo", repo.Name))
+		return nil, huma.Error401Unauthorized("webhook secret not configured")
+	}
 	if err := validateSignature(provider, secret, headers, input.RawBody); err != nil {
 		s.logger.Warn("webhook signature validation failed", slog.String("repo", repo.Name), slog.Any("error", err))
 		return nil, huma.Error401Unauthorized("invalid signature")
