@@ -1,0 +1,1 @@
+ALTER TABLE repos ADD COLUMN webhook_secret_env TEXT DEFAULT NULL;

@@ -222,3 +222,61 @@ func TestUpdateDeploymentStatusInvalid(t *testing.T) {
 		t.Errorf("error: got %v, want ErrInvalidStatus", err)
 	}
 }
+
+func TestFindRepoByURL(t *testing.T) {
+	store := newTestStore(t)
+	ctx := t.Context()
+
+	tests := []struct {
+		name    string
+		query   string
+		wantErr bool
+	}{
+		{name: "exact match", query: "https://example.com/repo.git"},
+		{name: "without .git", query: "https://example.com/repo"},
+		{name: "ssh format", query: "git@example.com:repo.git"},
+		{name: "trailing slash", query: "https://example.com/repo/"},
+		{name: "case insensitive", query: "https://Example.COM/Repo.git"},
+		{name: "no match", query: "https://other.com/repo.git", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, err := store.FindRepoByURL(ctx, tt.query)
+			if tt.wantErr {
+				if err != ErrNotFound {
+					t.Errorf("error: got %v, want ErrNotFound", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if repo.Name != testRepoName {
+				t.Errorf("name: got %q, want %q", repo.Name, testRepoName)
+			}
+		})
+	}
+}
+
+func TestNormalizeGitURL(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"https://github.com/org/repo.git", "github.com/org/repo"},
+		{"https://github.com/org/repo", "github.com/org/repo"},
+		{"git@github.com:org/repo.git", "github.com/org/repo"},
+		{"http://github.com/org/repo.git/", "github.com/org/repo"},
+		{"HTTPS://GitHub.COM/Org/Repo.git", "github.com/org/repo"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := normalizeGitURL(tt.input)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

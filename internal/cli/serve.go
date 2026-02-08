@@ -65,7 +65,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 	mgr := manager.New(store, tp, logger)
 	defer mgr.Close()
 
-	srv := server.New(cfg.Server.Port, mgr, tp, logger)
+	srvCfg := server.ServerConfig{
+		Webhook: cfg.Webhook,
+	}
+	srv := server.New(cfg.Server.Port, mgr, srvCfg, tp, logger)
 	if err := srv.Start(ctx); err != nil {
 		return fmt.Errorf("start server: %w", err)
 	}
