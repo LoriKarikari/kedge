@@ -88,14 +88,12 @@ func New(port int, svc Service, cfg ServerConfig, tp *telemetry.Provider, logger
 		Summary:     "Readiness check",
 	}, s.handleReady)
 
-	if cfg.Webhook.Enabled {
-		huma.Register(api, huma.Operation{
-			OperationID: "webhook",
-			Method:      http.MethodPost,
-			Path:        "/webhook",
-			Summary:     "Git webhook receiver",
-		}, s.handleWebhook)
-	}
+	huma.Register(api, huma.Operation{
+		OperationID: "webhook",
+		Method:      http.MethodPost,
+		Path:        "/webhook",
+		Summary:     "Git webhook receiver",
+	}, s.handleWebhook)
 
 	if tp != nil {
 		mux.Handle("/metrics", tp.Handler())

@@ -60,7 +60,6 @@ type MetricsConfig struct {
 }
 
 type Webhook struct {
-	Enabled   bool     `yaml:"enabled"`
 	SecretEnv string   `yaml:"secret_env"`
 	Providers []string `yaml:"providers"`
 }
@@ -96,7 +95,6 @@ func Default() *Config {
 			},
 		},
 		Webhook: Webhook{
-			Enabled:   false,
 			Providers: []string{"github", "gitlab", "gitea", "generic"},
 		},
 	}
