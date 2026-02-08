@@ -10,7 +10,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/LoriKarikari/kedge/internal/state"
-	"github.com/LoriKarikari/kedge/internal/webhook"
 )
 
 type WebhookInput struct {
@@ -30,9 +29,9 @@ type WebhookOutput struct {
 
 func (s *Server) handleWebhook(ctx context.Context, input *WebhookInput) (*WebhookOutput, error) {
 	headers := buildHeaders(input)
-	provider := webhook.DetectProvider(headers)
+	provider := detectProvider(headers)
 
-	payload, err := webhook.Parse(provider, input.RawBody)
+	payload, err := parseWebhook(provider, input.RawBody)
 	if err != nil {
 		s.logger.Warn("webhook parse failed", slog.Any("error", err))
 		return nil, huma.Error400BadRequest("invalid webhook payload")
@@ -45,7 +44,7 @@ func (s *Server) handleWebhook(ctx context.Context, input *WebhookInput) (*Webho
 	}
 
 	secret := resolveSecret(repo, s.cfg.Webhook.SecretEnv)
-	if err := webhook.ValidateSignature(provider, secret, headers, input.RawBody); err != nil {
+	if err := validateSignature(provider, secret, headers, input.RawBody); err != nil {
 		s.logger.Warn("webhook signature validation failed", slog.String("repo", repo.Name), slog.Any("error", err))
 		return nil, huma.Error401Unauthorized("invalid signature")
 	}

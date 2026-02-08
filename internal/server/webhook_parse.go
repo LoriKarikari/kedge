@@ -1,53 +1,53 @@
-package webhook
+package server
 
 import (
 	"fmt"
 	"net/http"
 )
 
-type Provider string
+type webhookProvider string
 
 const (
-	ProviderGitHub  Provider = "github"
-	ProviderGitLab  Provider = "gitlab"
-	ProviderGitea   Provider = "gitea"
-	ProviderGeneric Provider = "generic"
+	providerGitHub  webhookProvider = "github"
+	providerGitLab  webhookProvider = "gitlab"
+	providerGitea   webhookProvider = "gitea"
+	providerGeneric webhookProvider = "generic"
 )
 
-type Payload struct {
-	Provider Provider
+type webhookPayload struct {
+	Provider webhookProvider
 	RepoURL  string
 	Branch   string
 	Commit   string
 }
 
-func DetectProvider(headers http.Header) Provider {
+func detectProvider(headers http.Header) webhookProvider {
 	switch {
 	case headers.Get("X-Hub-Signature-256") != "":
-		return ProviderGitHub
+		return providerGitHub
 	case headers.Get("X-Gitlab-Token") != "":
-		return ProviderGitLab
+		return providerGitLab
 	case headers.Get("X-Gitea-Signature") != "":
-		return ProviderGitea
+		return providerGitea
 	default:
-		return ProviderGeneric
+		return providerGeneric
 	}
 }
 
-func Parse(provider Provider, body []byte) (*Payload, error) {
+func parseWebhook(provider webhookProvider, body []byte) (*webhookPayload, error) {
 	var (
-		payload *Payload
+		payload *webhookPayload
 		err     error
 	)
 
 	switch provider {
-	case ProviderGitHub:
+	case providerGitHub:
 		payload, err = parseGitHub(body)
-	case ProviderGitLab:
+	case providerGitLab:
 		payload, err = parseGitLab(body)
-	case ProviderGitea:
+	case providerGitea:
 		payload, err = parseGitea(body)
-	case ProviderGeneric:
+	case providerGeneric:
 		payload, err = parseGeneric(body)
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
@@ -60,19 +60,19 @@ func Parse(provider Provider, body []byte) (*Payload, error) {
 	return payload, nil
 }
 
-func ValidateSignature(provider Provider, secret string, headers http.Header, body []byte) error {
+func validateSignature(provider webhookProvider, secret string, headers http.Header, body []byte) error {
 	if secret == "" {
 		return nil
 	}
 
 	switch provider {
-	case ProviderGitHub:
+	case providerGitHub:
 		return validateGitHubSignature(secret, headers.Get("X-Hub-Signature-256"), body)
-	case ProviderGitLab:
+	case providerGitLab:
 		return validateGitLabToken(secret, headers.Get("X-Gitlab-Token"))
-	case ProviderGitea:
+	case providerGitea:
 		return validateGiteaSignature(secret, headers.Get("X-Gitea-Signature"), body)
-	case ProviderGeneric:
+	case providerGeneric:
 		return validateGenericSecret(secret, headers.Get("X-Webhook-Secret"))
 	default:
 		return fmt.Errorf("unsupported provider: %s", provider)

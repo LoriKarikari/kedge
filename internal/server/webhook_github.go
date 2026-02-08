@@ -1,4 +1,4 @@
-package webhook
+package server
 
 import (
 	"crypto/hmac"
@@ -19,7 +19,7 @@ type githubPush struct {
 	} `json:"repository"`
 }
 
-func parseGitHub(body []byte) (*Payload, error) {
+func parseGitHub(body []byte) (*webhookPayload, error) {
 	var push githubPush
 	if err := json.Unmarshal(body, &push); err != nil {
 		return nil, fmt.Errorf("parse github payload: %w", err)
@@ -35,7 +35,7 @@ func parseGitHub(body []byte) (*Payload, error) {
 		repoURL = push.Repository.HTMLURL
 	}
 
-	return &Payload{
+	return &webhookPayload{
 		RepoURL: repoURL,
 		Branch:  branch,
 		Commit:  push.After,

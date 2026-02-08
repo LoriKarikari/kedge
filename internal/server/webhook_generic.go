@@ -1,4 +1,4 @@
-package webhook
+package server
 
 import (
 	"crypto/subtle"
@@ -15,7 +15,7 @@ type genericPush struct {
 	} `json:"repository"`
 }
 
-func parseGeneric(body []byte) (*Payload, error) {
+func parseGeneric(body []byte) (*webhookPayload, error) {
 	var push genericPush
 	if err := json.Unmarshal(body, &push); err != nil {
 		return nil, fmt.Errorf("parse generic payload: %w", err)
@@ -26,7 +26,7 @@ func parseGeneric(body []byte) (*Payload, error) {
 		return nil, fmt.Errorf("not a branch push: %s", push.Ref)
 	}
 
-	return &Payload{
+	return &webhookPayload{
 		RepoURL: push.Repository.URL,
 		Branch:  branch,
 		Commit:  push.After,

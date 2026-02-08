@@ -1,4 +1,4 @@
-package webhook
+package server
 
 import (
 	"crypto/hmac"
@@ -26,27 +26,27 @@ func TestDetectProvider(t *testing.T) {
 	tests := []struct {
 		name    string
 		headers map[string]string
-		want    Provider
+		want    webhookProvider
 	}{
 		{
 			name:    "github",
 			headers: map[string]string{headerHubSignature: "sha256=abc"},
-			want:    ProviderGitHub,
+			want:    providerGitHub,
 		},
 		{
 			name:    "gitlab",
 			headers: map[string]string{headerGitLabToken: "token"},
-			want:    ProviderGitLab,
+			want:    providerGitLab,
 		},
 		{
 			name:    "gitea",
 			headers: map[string]string{headerGiteaSig: "abc"},
-			want:    ProviderGitea,
+			want:    providerGitea,
 		},
 		{
 			name:    "generic fallback",
 			headers: map[string]string{},
-			want:    ProviderGeneric,
+			want:    providerGeneric,
 		},
 	}
 
@@ -56,7 +56,7 @@ func TestDetectProvider(t *testing.T) {
 			for k, v := range tt.headers {
 				h.Set(k, v)
 			}
-			got := DetectProvider(h)
+			got := detectProvider(h)
 			if got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
@@ -75,7 +75,7 @@ func TestParseGitHub(t *testing.T) {
 		}
 	}`)
 
-	payload, err := Parse(ProviderGitHub, body)
+	payload, err := parseWebhook(providerGitHub, body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,8 +88,8 @@ func TestParseGitHub(t *testing.T) {
 	if payload.RepoURL != "https://github.com/org/repo.git" {
 		t.Errorf("url: got %q, want %q", payload.RepoURL, "https://github.com/org/repo.git")
 	}
-	if payload.Provider != ProviderGitHub {
-		t.Errorf("provider: got %q, want %q", payload.Provider, ProviderGitHub)
+	if payload.Provider != providerGitHub {
+		t.Errorf("provider: got %q, want %q", payload.Provider, providerGitHub)
 	}
 }
 
@@ -104,7 +104,7 @@ func TestParseGitLab(t *testing.T) {
 		}
 	}`)
 
-	payload, err := Parse(ProviderGitLab, body)
+	payload, err := parseWebhook(providerGitLab, body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestParseGitea(t *testing.T) {
 		}
 	}`)
 
-	payload, err := Parse(ProviderGitea, body)
+	payload, err := parseWebhook(providerGitea, body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestParseGeneric(t *testing.T) {
 		"repository": {"url": "https://example.com/repo.git"}
 	}`)
 
-	payload, err := Parse(ProviderGeneric, body)
+	payload, err := parseWebhook(providerGeneric, body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,9 +159,9 @@ func TestParseTagRefRejected(t *testing.T) {
 		"repository": {"clone_url": "https://github.com/org/repo.git"}
 	}`)
 
-	for _, provider := range []Provider{ProviderGitHub, ProviderGitLab, ProviderGitea, ProviderGeneric} {
+	for _, provider := range []webhookProvider{providerGitHub, providerGitLab, providerGitea, providerGeneric} {
 		t.Run(string(provider), func(t *testing.T) {
-			_, err := Parse(provider, body)
+			_, err := parseWebhook(provider, body)
 			if err == nil {
 				t.Error("expected error for tag ref")
 			}
@@ -177,12 +177,12 @@ func TestValidateGitHubSignature(t *testing.T) {
 	headers := http.Header{}
 	headers.Set(headerHubSignature, sig)
 
-	if err := ValidateSignature(ProviderGitHub, secret, headers, body); err != nil {
+	if err := validateSignature(providerGitHub, secret, headers, body); err != nil {
 		t.Errorf("valid signature rejected: %v", err)
 	}
 
 	headers.Set(headerHubSignature, "sha256=invalid")
-	if err := ValidateSignature(ProviderGitHub, secret, headers, body); err == nil {
+	if err := validateSignature(providerGitHub, secret, headers, body); err == nil {
 		t.Error("invalid signature accepted")
 	}
 }
@@ -192,12 +192,12 @@ func TestValidateGitLabToken(t *testing.T) {
 	headers := http.Header{}
 	headers.Set(headerGitLabToken, secret)
 
-	if err := ValidateSignature(ProviderGitLab, secret, headers, nil); err != nil {
+	if err := validateSignature(providerGitLab, secret, headers, nil); err != nil {
 		t.Errorf("valid token rejected: %v", err)
 	}
 
 	headers.Set(headerGitLabToken, "wrong")
-	if err := ValidateSignature(ProviderGitLab, secret, headers, nil); err == nil {
+	if err := validateSignature(providerGitLab, secret, headers, nil); err == nil {
 		t.Error("invalid token accepted")
 	}
 }
@@ -210,12 +210,12 @@ func TestValidateGiteaSignature(t *testing.T) {
 	headers := http.Header{}
 	headers.Set(headerGiteaSig, sig)
 
-	if err := ValidateSignature(ProviderGitea, secret, headers, body); err != nil {
+	if err := validateSignature(providerGitea, secret, headers, body); err != nil {
 		t.Errorf("valid signature rejected: %v", err)
 	}
 
 	headers.Set(headerGiteaSig, "invalid")
-	if err := ValidateSignature(ProviderGitea, secret, headers, body); err == nil {
+	if err := validateSignature(providerGitea, secret, headers, body); err == nil {
 		t.Error("invalid signature accepted")
 	}
 }
@@ -225,21 +225,21 @@ func TestValidateGenericSecret(t *testing.T) {
 	headers := http.Header{}
 	headers.Set(headerWebhookSecret, secret)
 
-	if err := ValidateSignature(ProviderGeneric, secret, headers, nil); err != nil {
+	if err := validateSignature(providerGeneric, secret, headers, nil); err != nil {
 		t.Errorf("valid secret rejected: %v", err)
 	}
 
 	headers.Set(headerWebhookSecret, "wrong")
-	if err := ValidateSignature(ProviderGeneric, secret, headers, nil); err == nil {
+	if err := validateSignature(providerGeneric, secret, headers, nil); err == nil {
 		t.Error("invalid secret accepted")
 	}
 }
 
 func TestValidateEmptySecretSkips(t *testing.T) {
 	headers := http.Header{}
-	for _, provider := range []Provider{ProviderGitHub, ProviderGitLab, ProviderGitea, ProviderGeneric} {
+	for _, provider := range []webhookProvider{providerGitHub, providerGitLab, providerGitea, providerGeneric} {
 		t.Run(string(provider), func(t *testing.T) {
-			if err := ValidateSignature(provider, "", headers, nil); err != nil {
+			if err := validateSignature(provider, "", headers, nil); err != nil {
 				t.Errorf("empty secret should skip validation: %v", err)
 			}
 		})

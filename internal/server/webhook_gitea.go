@@ -1,4 +1,4 @@
-package webhook
+package server
 
 import (
 	"crypto/hmac"
@@ -19,7 +19,7 @@ type giteaPush struct {
 	} `json:"repository"`
 }
 
-func parseGitea(body []byte) (*Payload, error) {
+func parseGitea(body []byte) (*webhookPayload, error) {
 	var push giteaPush
 	if err := json.Unmarshal(body, &push); err != nil {
 		return nil, fmt.Errorf("parse gitea payload: %w", err)
@@ -35,7 +35,7 @@ func parseGitea(body []byte) (*Payload, error) {
 		repoURL = push.Repository.HTMLURL
 	}
 
-	return &Payload{
+	return &webhookPayload{
 		RepoURL: repoURL,
 		Branch:  branch,
 		Commit:  push.After,

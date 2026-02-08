@@ -1,4 +1,4 @@
-package webhook
+package server
 
 import (
 	"crypto/subtle"
@@ -17,7 +17,7 @@ type gitlabPush struct {
 	} `json:"repository"`
 }
 
-func parseGitLab(body []byte) (*Payload, error) {
+func parseGitLab(body []byte) (*webhookPayload, error) {
 	var push gitlabPush
 	if err := json.Unmarshal(body, &push); err != nil {
 		return nil, fmt.Errorf("parse gitlab payload: %w", err)
@@ -33,7 +33,7 @@ func parseGitLab(body []byte) (*Payload, error) {
 		repoURL = push.Repository.URL
 	}
 
-	return &Payload{
+	return &webhookPayload{
 		RepoURL: repoURL,
 		Branch:  branch,
 		Commit:  push.After,
