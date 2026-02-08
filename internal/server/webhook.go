@@ -63,11 +63,11 @@ func (s *Server) handleWebhook(ctx context.Context, input *WebhookInput) (*Webho
 
 	existing, err := s.svc.Store().GetDeploymentByCommit(ctx, repo.Name, payload.Commit)
 	if err == nil && existing != nil && existing.Status == state.StatusSuccess {
-		s.logger.Info("webhook skipped, commit already deployed", slog.String("repo", repo.Name), slog.String("commit", payload.Commit[:8]))
+		s.logger.Info("webhook skipped, commit already deployed", slog.String("repo", repo.Name), slog.String("commit", shortCommit(payload.Commit)))
 		return webhookResponse("already deployed", repo.Name), nil
 	}
 
-	s.logger.Info("webhook triggering sync", slog.String("repo", repo.Name), slog.String("commit", payload.Commit[:8]))
+	s.logger.Info("webhook triggering sync", slog.String("repo", repo.Name), slog.String("commit", shortCommit(payload.Commit)))
 	go func() {
 		syncCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
@@ -115,6 +115,13 @@ func resolveSecret(repo *state.Repo, globalSecretEnv string) string {
 		return os.Getenv(globalSecretEnv)
 	}
 	return ""
+}
+
+func shortCommit(s string) string {
+	if len(s) <= 8 {
+		return s
+	}
+	return s[:8]
 }
 
 func webhookResponse(status, repo string) *WebhookOutput {
