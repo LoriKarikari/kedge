@@ -18,6 +18,7 @@ type Config struct {
 	Logging        Logging        `yaml:"logging"`
 	Server         Server         `yaml:"server"`
 	Telemetry      Telemetry      `yaml:"telemetry"`
+	Webhook        Webhook        `yaml:"webhook"`
 }
 
 type Git struct {
@@ -58,6 +59,12 @@ type MetricsConfig struct {
 	Enabled bool `yaml:"enabled"`
 }
 
+type Webhook struct {
+	Enabled   bool     `yaml:"enabled"`
+	SecretEnv string   `yaml:"secret_env"`
+	Providers []string `yaml:"providers"`
+}
+
 func Default() *Config {
 	return &Config{
 		Git: Git{
@@ -87,6 +94,10 @@ func Default() *Config {
 			Metrics: MetricsConfig{
 				Enabled: true,
 			},
+		},
+		Webhook: Webhook{
+			Enabled:   false,
+			Providers: []string{"github", "gitlab", "gitea", "generic"},
 		},
 	}
 }
