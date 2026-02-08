@@ -199,6 +199,25 @@ func (m *Manager) Status() map[string]*RepoStatus {
 	return result
 }
 
+func (m *Manager) TriggerSync(ctx context.Context, repoName string) error {
+	m.mu.RLock()
+	ctrl, exists := m.controllers[repoName]
+	m.mu.RUnlock()
+
+	if !exists {
+		return fmt.Errorf("repo not found: %s", repoName)
+	}
+	return ctrl.PullAndReconcile(ctx)
+}
+
+func (m *Manager) FindRepoByURL(ctx context.Context, rawURL string) (*state.Repo, error) {
+	return m.store.FindRepoByURL(ctx, rawURL)
+}
+
+func (m *Manager) Store() *state.Store {
+	return m.store
+}
+
 func (m *Manager) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
