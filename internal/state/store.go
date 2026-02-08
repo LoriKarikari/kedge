@@ -233,6 +233,7 @@ var sshURLPattern = regexp.MustCompile(`^[\w-]+@([^:]+):(.+)$`)
 
 func normalizeGitURL(rawURL string) string {
 	s := strings.TrimSpace(rawURL)
+	s = strings.ToLower(s)
 
 	if matches := sshURLPattern.FindStringSubmatch(s); len(matches) == 3 {
 		s = matches[1] + "/" + matches[2]
@@ -240,10 +241,10 @@ func normalizeGitURL(rawURL string) string {
 
 	s = strings.TrimPrefix(s, "https://")
 	s = strings.TrimPrefix(s, "http://")
-	s = strings.TrimSuffix(s, ".git")
 	s = strings.TrimRight(s, "/")
+	s = strings.TrimSuffix(s, ".git")
 
-	return strings.ToLower(s)
+	return s
 }
 
 func (s *Store) SaveDeployment(ctx context.Context, repoName, commit, composeContent string, status DeploymentStatus, message string) (*Deployment, error) {

@@ -14,11 +14,11 @@ import (
 )
 
 type WebhookInput struct {
-	RawBody              []byte `json:"-"`
-	XHubSignature256     string `header:"X-Hub-Signature-256"`
-	XGitlabToken         string `header:"X-Gitlab-Token"`
-	XGiteaSignature      string `header:"X-Gitea-Signature"`
-	XWebhookSecret       string `header:"X-Webhook-Secret"`
+	RawBody          []byte `json:"-"`
+	XHubSignature256 string `header:"X-Hub-Signature-256"`
+	XGitlabToken     string `header:"X-Gitlab-Token"`
+	XGiteaSignature  string `header:"X-Gitea-Signature"`
+	XWebhookSecret   string `header:"X-Webhook-Secret"`
 }
 
 type WebhookOutput struct {
