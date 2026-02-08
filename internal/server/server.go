@@ -12,16 +12,28 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
+	"github.com/LoriKarikari/kedge/internal/config"
+	"github.com/LoriKarikari/kedge/internal/manager"
+	"github.com/LoriKarikari/kedge/internal/state"
 	"github.com/LoriKarikari/kedge/internal/telemetry"
 )
 
-type ReadinessChecker interface {
+type Service interface {
 	IsReady() bool
+	TriggerSync(ctx context.Context, repoName string) error
+	FindRepoByURL(ctx context.Context, rawURL string) (*state.Repo, error)
+	Status() map[string]*manager.RepoStatus
+	Store() *state.Store
+}
+
+type ServerConfig struct {
+	Webhook config.Webhook
 }
 
 type Server struct {
 	server    *http.Server
-	checker   ReadinessChecker
+	svc       Service
+	cfg       ServerConfig
 	telemetry *telemetry.Provider
 	logger    *slog.Logger
 }
@@ -39,7 +51,7 @@ type ReadyOutput struct {
 	}
 }
 
-func New(port int, checker ReadinessChecker, tp *telemetry.Provider, logger *slog.Logger) *Server {
+func New(port int, svc Service, cfg ServerConfig, tp *telemetry.Provider, logger *slog.Logger) *Server {
 	mux := http.NewServeMux()
 	api := humago.New(mux, huma.DefaultConfig("Kedge API", "1.0.0"))
 
@@ -56,7 +68,8 @@ func New(port int, checker ReadinessChecker, tp *telemetry.Provider, logger *slo
 			WriteTimeout:      15 * time.Second,
 			IdleTimeout:       120 * time.Second,
 		},
-		checker:   checker,
+		svc:       svc,
+		cfg:       cfg,
 		telemetry: tp,
 		logger:    logger,
 	}
@@ -75,6 +88,15 @@ func New(port int, checker ReadinessChecker, tp *telemetry.Provider, logger *slo
 		Summary:     "Readiness check",
 	}, s.handleReady)
 
+	if cfg.Webhook.Enabled {
+		huma.Register(api, huma.Operation{
+			OperationID: "webhook",
+			Method:      http.MethodPost,
+			Path:        "/webhook",
+			Summary:     "Git webhook receiver",
+		}, s.handleWebhook)
+	}
+
 	if tp != nil {
 		mux.Handle("/metrics", tp.Handler())
 	}
@@ -91,7 +113,7 @@ func (s *Server) handleHealth(ctx context.Context, input *struct{}) (*HealthOutp
 }
 
 func (s *Server) handleReady(ctx context.Context, input *struct{}) (*ReadyOutput, error) {
-	ready := s.checker != nil && s.checker.IsReady()
+	ready := s.svc != nil && s.svc.IsReady()
 	output := &ReadyOutput{}
 	output.Body.Ready = ready
 	if ready {
