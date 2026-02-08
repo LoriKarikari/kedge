@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"regexp"
+	"strings"
 	"time"
 
 	z "github.com/Oudwins/zog"
@@ -27,14 +29,15 @@ type Store struct {
 }
 
 type Repo struct {
-	Name        string
-	URL         string
-	Branch      string
-	CreatedAt   time.Time
-	AuthType    string
-	SSHKeyPath  string
-	Username    string
-	PasswordEnv string
+	Name             string
+	URL              string
+	Branch           string
+	CreatedAt        time.Time
+	AuthType         string
+	SSHKeyPath       string
+	Username         string
+	PasswordEnv      string
+	WebhookSecretEnv string
 }
 
 type RepoAuth struct {
@@ -133,7 +136,7 @@ func nullString(s string) any {
 
 func (s *Store) GetRepo(ctx context.Context, name string) (*Repo, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT name, url, branch, created_at, auth_type, auth_ssh_key_path, auth_username, auth_password_env FROM repos WHERE name = ?`,
+		`SELECT name, url, branch, created_at, auth_type, auth_ssh_key_path, auth_username, auth_password_env, webhook_secret_env FROM repos WHERE name = ?`,
 		name,
 	)
 	r, err := scanRepo(row)
@@ -148,8 +151,8 @@ func (s *Store) GetRepo(ctx context.Context, name string) (*Repo, error) {
 
 func scanRepo(row *sql.Row) (*Repo, error) {
 	var r Repo
-	var authType, sshKeyPath, username, passwordEnv sql.NullString
-	err := row.Scan(&r.Name, &r.URL, &r.Branch, &r.CreatedAt, &authType, &sshKeyPath, &username, &passwordEnv)
+	var authType, sshKeyPath, username, passwordEnv, webhookSecretEnv sql.NullString
+	err := row.Scan(&r.Name, &r.URL, &r.Branch, &r.CreatedAt, &authType, &sshKeyPath, &username, &passwordEnv, &webhookSecretEnv)
 	if err != nil {
 		return nil, err
 	}
@@ -157,12 +160,13 @@ func scanRepo(row *sql.Row) (*Repo, error) {
 	r.SSHKeyPath = sshKeyPath.String
 	r.Username = username.String
 	r.PasswordEnv = passwordEnv.String
+	r.WebhookSecretEnv = webhookSecretEnv.String
 	return &r, nil
 }
 
 func (s *Store) ListRepos(ctx context.Context) ([]*Repo, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT name, url, branch, created_at, auth_type, auth_ssh_key_path, auth_username, auth_password_env FROM repos ORDER BY name`,
+		`SELECT name, url, branch, created_at, auth_type, auth_ssh_key_path, auth_username, auth_password_env, webhook_secret_env FROM repos ORDER BY name`,
 	)
 	if err != nil {
 		return nil, err
@@ -182,8 +186,8 @@ func (s *Store) ListRepos(ctx context.Context) ([]*Repo, error) {
 
 func scanRepoRows(rows *sql.Rows) (*Repo, error) {
 	var r Repo
-	var authType, sshKeyPath, username, passwordEnv sql.NullString
-	err := rows.Scan(&r.Name, &r.URL, &r.Branch, &r.CreatedAt, &authType, &sshKeyPath, &username, &passwordEnv)
+	var authType, sshKeyPath, username, passwordEnv, webhookSecretEnv sql.NullString
+	err := rows.Scan(&r.Name, &r.URL, &r.Branch, &r.CreatedAt, &authType, &sshKeyPath, &username, &passwordEnv, &webhookSecretEnv)
 	if err != nil {
 		return nil, err
 	}
@@ -191,6 +195,7 @@ func scanRepoRows(rows *sql.Rows) (*Repo, error) {
 	r.SSHKeyPath = sshKeyPath.String
 	r.Username = username.String
 	r.PasswordEnv = passwordEnv.String
+	r.WebhookSecretEnv = webhookSecretEnv.String
 	return &r, nil
 }
 
@@ -207,6 +212,38 @@ func (s *Store) DeleteRepo(ctx context.Context, name string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (s *Store) FindRepoByURL(ctx context.Context, rawURL string) (*Repo, error) {
+	repos, err := s.ListRepos(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	normalized := normalizeGitURL(rawURL)
+	for _, r := range repos {
+		if normalizeGitURL(r.URL) == normalized {
+			return r, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
+var sshURLPattern = regexp.MustCompile(`^[\w-]+@([^:]+):(.+)$`)
+
+func normalizeGitURL(rawURL string) string {
+	s := strings.TrimSpace(rawURL)
+
+	if matches := sshURLPattern.FindStringSubmatch(s); len(matches) == 3 {
+		s = matches[1] + "/" + matches[2]
+	}
+
+	s = strings.TrimPrefix(s, "https://")
+	s = strings.TrimPrefix(s, "http://")
+	s = strings.TrimSuffix(s, ".git")
+	s = strings.TrimRight(s, "/")
+
+	return strings.ToLower(s)
 }
 
 func (s *Store) SaveDeployment(ctx context.Context, repoName, commit, composeContent string, status DeploymentStatus, message string) (*Deployment, error) {
