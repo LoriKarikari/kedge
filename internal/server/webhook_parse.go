@@ -23,11 +23,11 @@ type webhookPayload struct {
 
 func detectProvider(headers http.Header) webhookProvider {
 	switch {
-	case headers.Get("X-Hub-Signature-256") != "":
+	case headers.Get("X-GitHub-Event") != "":
 		return providerGitHub
-	case headers.Get("X-Gitlab-Token") != "":
+	case headers.Get("X-Gitlab-Event") != "":
 		return providerGitLab
-	case headers.Get("X-Gitea-Signature") != "":
+	case headers.Get("X-Gitea-Event") != "":
 		return providerGitea
 	default:
 		return providerGeneric

@@ -14,8 +14,11 @@ import (
 
 type WebhookInput struct {
 	RawBody          []byte `json:"-"`
+	XGitHubEvent     string `header:"X-GitHub-Event"`
 	XHubSignature256 string `header:"X-Hub-Signature-256"`
+	XGitlabEvent     string `header:"X-Gitlab-Event"`
 	XGitlabToken     string `header:"X-Gitlab-Token"`
+	XGiteaEvent      string `header:"X-Gitea-Event"`
 	XGiteaSignature  string `header:"X-Gitea-Signature"`
 	XWebhookSecret   string `header:"X-Webhook-Secret"`
 }
@@ -74,11 +77,20 @@ func (s *Server) handleWebhook(ctx context.Context, input *WebhookInput) (*Webho
 
 func buildHeaders(input *WebhookInput) http.Header {
 	h := http.Header{}
+	if input.XGitHubEvent != "" {
+		h.Set("X-GitHub-Event", input.XGitHubEvent)
+	}
 	if input.XHubSignature256 != "" {
 		h.Set("X-Hub-Signature-256", input.XHubSignature256)
 	}
+	if input.XGitlabEvent != "" {
+		h.Set("X-Gitlab-Event", input.XGitlabEvent)
+	}
 	if input.XGitlabToken != "" {
 		h.Set("X-Gitlab-Token", input.XGitlabToken)
+	}
+	if input.XGiteaEvent != "" {
+		h.Set("X-Gitea-Event", input.XGiteaEvent)
 	}
 	if input.XGiteaSignature != "" {
 		h.Set("X-Gitea-Signature", input.XGiteaSignature)

@@ -22,7 +22,6 @@ const (
 	contentTypeJSON = "application/json"
 	wantStatusFmt   = "status: got %d, want %d"
 	wantFieldFmt    = "got %q, want %q"
-	fakeGitHubSig   = "sha256=fakesig"
 )
 
 type mockService struct {
@@ -135,7 +134,7 @@ func TestWebhookEndpointTagRefRejected(t *testing.T) {
 
 	resp := postWebhook(t, client, ts.URL,
 		`{"ref":"refs/tags/v1.0.0","after":"abc123","repository":{"clone_url":"https://github.com/test/repo.git"}}`,
-		map[string]string{headerHubSignature: fakeGitHubSig})
+		map[string]string{headerGitHubEvent: "push"})
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf(wantStatusFmt, resp.StatusCode, http.StatusBadRequest)
@@ -151,7 +150,7 @@ func TestWebhookEndpointBranchMismatch(t *testing.T) {
 
 	resp := postWebhook(t, client, ts.URL,
 		`{"ref":"refs/heads/develop","after":"abc123def456","repository":{"clone_url":"https://github.com/org/repo.git"}}`,
-		map[string]string{headerHubSignature: fakeGitHubSig})
+		map[string]string{headerGitHubEvent: "push"})
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf(wantStatusFmt, resp.StatusCode, http.StatusOK)
@@ -173,7 +172,7 @@ func TestWebhookEndpointSyncTriggered(t *testing.T) {
 
 	resp := postWebhook(t, client, ts.URL,
 		`{"ref":"refs/heads/main","after":"abc123def456","repository":{"clone_url":"https://github.com/org/repo.git"}}`,
-		map[string]string{headerHubSignature: fakeGitHubSig})
+		map[string]string{headerGitHubEvent: "push"})
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf(wantStatusFmt, resp.StatusCode, http.StatusOK)

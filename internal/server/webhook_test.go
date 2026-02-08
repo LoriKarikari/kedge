@@ -9,8 +9,11 @@ import (
 )
 
 const (
+	headerGitHubEvent   = "X-GitHub-Event"
 	headerHubSignature  = "X-Hub-Signature-256"
+	headerGitLabEvent   = "X-Gitlab-Event"
 	headerGitLabToken   = "X-Gitlab-Token"
+	headerGiteaEvent    = "X-Gitea-Event"
 	headerGiteaSig      = "X-Gitea-Signature"
 	headerWebhookSecret = "X-Webhook-Secret"
 	testCommitFmt       = "commit: got %q, want %q"
@@ -30,17 +33,22 @@ func TestDetectProvider(t *testing.T) {
 	}{
 		{
 			name:    "github",
-			headers: map[string]string{headerHubSignature: "sha256=abc"},
+			headers: map[string]string{headerGitHubEvent: "push"},
+			want:    providerGitHub,
+		},
+		{
+			name:    "github with signature only",
+			headers: map[string]string{headerGitHubEvent: "push", headerHubSignature: "sha256=abc"},
 			want:    providerGitHub,
 		},
 		{
 			name:    "gitlab",
-			headers: map[string]string{headerGitLabToken: "token"},
+			headers: map[string]string{headerGitLabEvent: "Push Hook"},
 			want:    providerGitLab,
 		},
 		{
 			name:    "gitea",
-			headers: map[string]string{headerGiteaSig: "abc"},
+			headers: map[string]string{headerGiteaEvent: "push"},
 			want:    providerGitea,
 		},
 		{
