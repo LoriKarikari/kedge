@@ -215,6 +215,17 @@ func (c *Controller) loadProject(ctx context.Context, commit string) error {
 	return nil
 }
 
+func (c *Controller) PullAndReconcile(ctx context.Context) error {
+	changed, hash, err := c.watcher.Pull(ctx)
+	if err != nil {
+		return fmt.Errorf("pull: %w", err)
+	}
+	if !changed {
+		return nil
+	}
+	return c.loadAndReconcile(ctx, hash)
+}
+
 func (c *Controller) Sync(ctx context.Context) (*reconcile.Result, error) {
 	if err := c.loadProject(ctx, ""); err != nil {
 		return nil, err
