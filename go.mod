@@ -10,7 +10,7 @@ require (
 	github.com/danielgtaylor/huma/v2 v2.35.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.6.0
-	github.com/go-git/go-git/v5 v5.16.4
+	github.com/go-git/go-git/v5 v5.16.5
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/lmittmann/tint v1.1.3
 	github.com/prometheus/client_golang v1.23.2
