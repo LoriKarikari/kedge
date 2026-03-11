@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	github.com/Oudwins/zog v0.22.0
-	github.com/charmbracelet/huh v0.8.0
+	github.com/charmbracelet/huh v1.0.0
 	github.com/compose-spec/compose-go/v2 v2.10.1
 	github.com/containerd/errdefs v1.0.0
 	github.com/danielgtaylor/huma/v2 v2.35.0
